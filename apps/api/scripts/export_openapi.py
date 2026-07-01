@@ -5,7 +5,7 @@ their types from this file, so they never drift from the server.
 
     poetry run python scripts/export_openapi.py [output_path]
 
-Defaults to writing ../fin-front/src/lib/api/openapi.json relative to the repo.
+Defaults to writing ../web/src/lib/api/openapi.json relative to the repo.
 Building the app touches no database, so this is safe to run anywhere.
 """
 
@@ -25,7 +25,7 @@ os.environ.setdefault("SECRET_KEY", "openapi-export-not-a-real-secret")
 from app.factory import create_app  # noqa: E402
 
 DEFAULT_OUTPUT = os.path.join(
-    os.path.dirname(__file__), "..", "..", "fin-front", "src", "lib", "api", "openapi.json"
+    os.path.dirname(__file__), "..", "..", "web", "src", "lib", "api", "openapi.json"
 )
 
 

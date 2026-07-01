@@ -10,7 +10,7 @@ of each. In short:
 
 ```bash
 # Backend
-cd fin-backend && poetry install --with dev
+cd apps/api && poetry install --with dev
 
 # Web + mobile (from repo root)
 npm install
@@ -30,7 +30,7 @@ Run the same checks CI runs, locally:
 **Backend**
 
 ```bash
-cd fin-backend
+cd apps/api
 poetry run ruff check app tests        # lint
 poetry run pytest                      # tests + coverage gate (fails under threshold)
 ```
@@ -46,7 +46,7 @@ npm run build -w finance-tracking-app
 **Mobile**
 
 ```bash
-npm run typecheck -w fin-mobile
+npm run typecheck -w mobile
 ```
 
 Pre-commit hooks are configured in [`.pre-commit-config.yaml`](./.pre-commit-config.yaml);
@@ -54,7 +54,7 @@ install them with `pre-commit install` to catch issues before committing.
 
 ## Tests
 
-- New behavior needs tests. Backend tests live in `fin-backend/tests/`.
+- New behavior needs tests. Backend tests live in `apps/api/tests/`.
 - Prefer fast, deterministic unit tests for domain logic (see
   `tests/test_goals_calculator.py`, `tests/test_schemas_validation.py`).
 - The backend enforces a coverage floor; raise it as integration coverage grows
@@ -65,7 +65,7 @@ install them with `pre-commit install` to catch issues before committing.
 Schema changes go through Alembic migrations:
 
 ```bash
-cd fin-backend
+cd apps/api
 poetry run alembic revision --autogenerate -m "describe change"
 poetry run alembic upgrade head
 ```

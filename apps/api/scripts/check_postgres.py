@@ -1,4 +1,4 @@
-"""Smoke test: async Postgres reachable with DATABASE_URL from .env (run from fin-backend)."""
+"""Smoke test: async Postgres reachable with DATABASE_URL from .env (run from apps/api)."""
 
 from __future__ import annotations
 

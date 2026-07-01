@@ -28,7 +28,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: web-coverage
-          path: fin-front/coverage
+          path: apps/web/coverage
           if-no-files-found: ignore
 
   mobile:
@@ -41,14 +41,14 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - run: npm run typecheck -w fin-mobile
+      - run: npm run typecheck -w mobile
 
   backend:
     name: API (ruff, pytest)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: fin-backend
+        working-directory: apps/api
     services:
       postgres:
         image: postgres:16-alpine
@@ -74,8 +74,8 @@ jobs:
       - name: Cache Poetry virtualenv
         uses: actions/cache@v4
         with:
-          path: fin-backend/.venv
-          key: poetry-${{ hashFiles('fin-backend/poetry.lock') }}
+          path: apps/api/.venv
+          key: poetry-${{ hashFiles('apps/api/poetry.lock') }}
       - run: pip install "poetry==2.1.1"
       - run: poetry config virtualenvs.in-project true
       - run: poetry install --with dev --no-interaction
@@ -86,14 +86,14 @@ jobs:
       - name: Verify committed OpenAPI schema is up to date
         run: |
           poetry run python scripts/export_openapi.py /tmp/openapi.json
-          diff -u ../fin-front/src/lib/api/openapi.json /tmp/openapi.json \
+          diff -u ../web/src/lib/api/openapi.json /tmp/openapi.json \
             || (echo "::error::OpenAPI schema is stale — run 'poetry run python scripts/export_openapi.py' and commit." && exit 1)
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: fin-backend/coverage.xml
+          path: apps/api/coverage.xml
           if-no-files-found: ignore
 
   docker:
@@ -139,7 +139,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: fin-front/playwright-report
+          path: apps/web/playwright-report
           if-no-files-found: ignore
       - name: Dump compose logs on failure
         if: failure()

@@ -16,7 +16,7 @@ Please include:
 
 - A description of the vulnerability and its impact.
 - Steps to reproduce (proof-of-concept where possible).
-- Affected component(s) — `fin-backend`, `fin-front`, `fin-mobile`, or infra.
+- Affected component(s) — `api`, `web`, `mobile`, or infra.
 - Any suggested remediation.
 
 We aim to acknowledge reports within a few business days and will keep you

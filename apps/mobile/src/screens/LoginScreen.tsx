@@ -49,7 +49,7 @@ export function LoginScreen({ navigation }: Props) {
         <Text style={styles.sub}>Use the same email and password as the API.</Text>
         {err ? <Text style={styles.err}>{err}</Text> : null}
         {!isApiConfigured() ? (
-          <Text style={styles.warn}>Configure EXPO_PUBLIC_API_BASE_URL to reach fin-backend.</Text>
+          <Text style={styles.warn}>Configure EXPO_PUBLIC_API_BASE_URL to reach the API.</Text>
         ) : null}
         <Text style={styles.label}>Email</Text>
         <TextInput

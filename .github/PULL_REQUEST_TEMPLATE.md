@@ -12,9 +12,9 @@
 
 ## Affected components
 
-- [ ] Backend (`fin-backend`)
-- [ ] Web (`fin-front`)
-- [ ] Mobile (`fin-mobile`)
+- [ ] Backend (`apps/api`)
+- [ ] Web (`apps/web`)
+- [ ] Mobile (`apps/mobile`)
 - [ ] Infra / CI / docs
 
 ## How was this tested?

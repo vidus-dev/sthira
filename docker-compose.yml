@@ -23,7 +23,7 @@ services:
 
   api:
     build:
-      context: ./fin-backend
+      context: ./apps/api
       dockerfile: Dockerfile
     environment:
       ENVIRONMENT: development
@@ -39,7 +39,7 @@ services:
 
   web:
     build:
-      context: ./fin-front
+      context: ./apps/web
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ""

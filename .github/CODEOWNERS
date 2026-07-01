@@ -1,19 +1,19 @@
-# Code owners for finance-tracker.
-# These owners are requested for review automatically on matching changes.
-# Enable "Require review from Code Owners" in branch protection to enforce.
+# Code owners. These owners are requested for review automatically on
+# matching changes. Enable "Require review from Code Owners" in branch
+# protection to enforce.
 
 # Default owner for everything in the repo.
-*                       @vinayykkumar
+*                       @vidus-dev
 
 # Backend (FastAPI API)
-/fin-backend/           @vinayykkumar
+/apps/api/              @vidus-dev
 
 # Web app
-/fin-front/             @vinayykkumar
+/apps/web/              @vidus-dev
 
 # Mobile app
-/fin-mobile/            @vinayykkumar
+/apps/mobile/           @vidus-dev
 
 # CI/CD, security, and repo governance
-/.github/               @vinayykkumar
-/docs/                  @vinayykkumar
+/.github/               @vidus-dev
+/docs/                  @vidus-dev

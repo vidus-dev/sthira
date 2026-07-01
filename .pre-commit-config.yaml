@@ -15,5 +15,5 @@ repos:
     rev: v0.8.6
     hooks:
       - id: ruff
-        args: ["--config", "fin-backend/pyproject.toml"]
-        files: ^fin-backend/(app|tests)/
+        args: ["--config", "apps/api/pyproject.toml"]
+        files: ^apps/api/(app|tests)/

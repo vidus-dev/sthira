@@ -11,9 +11,9 @@ labels: bug
 
 ## Affected component
 
-- [ ] Backend (`fin-backend`)
-- [ ] Web (`fin-front`)
-- [ ] Mobile (`fin-mobile`)
+- [ ] Backend (`apps/api`)
+- [ ] Web (`apps/web`)
+- [ ] Mobile (`apps/mobile`)
 - [ ] Infra / CI
 
 ## Steps to reproduce

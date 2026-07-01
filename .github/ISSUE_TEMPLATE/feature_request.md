@@ -15,9 +15,9 @@ labels: enhancement
 
 ## Affected component
 
-- [ ] Backend (`fin-backend`)
-- [ ] Web (`fin-front`)
-- [ ] Mobile (`fin-mobile`)
+- [ ] Backend (`apps/api`)
+- [ ] Web (`apps/web`)
+- [ ] Mobile (`apps/mobile`)
 - [ ] Infra / CI
 
 ## Alternatives considered
