@@ -1,0 +1,1 @@
+"""Monthly budget lines module."""
