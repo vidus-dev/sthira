@@ -1,6 +1,8 @@
-# Finance Tracking Application
+# Web client
 
-A comprehensive finance tracking application with analytics, budgeting, and investment management features built with React, TypeScript, and Tailwind CSS.
+The Sthira web app — accounts, transactions, budgeting, and goals — built with
+React, TypeScript, Vite, and Tailwind CSS. It talks to the `/v1` API using types
+generated from the server's OpenAPI schema.
 
 ## Features
 

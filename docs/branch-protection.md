@@ -1,9 +1,11 @@
 # Enabling branch protection on `main`
 
-This is the **only** production-grade requirement that cannot be configured from
-inside the repository — it lives in GitHub repository settings. The CI, CodeQL,
-and security workflows are already built and run on every pull request; branch
-protection is what makes them *enforced* (blocking) rather than advisory.
+Branch protection lives in GitHub repository settings, not in the repo. The CI,
+CodeQL, and security workflows exist; branch protection is what makes their checks
+*enforced* (blocking a merge) rather than advisory. Note that these workflows are
+configured to run manually (`workflow_dispatch`), so to require them on pull
+requests you must also add a `pull_request` trigger to the workflows you want to
+block on.
 
 ## What to require
 
