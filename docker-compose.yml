@@ -1,0 +1,53 @@
+# Full stack: Postgres + FastAPI + static web (nginx proxies /v1 → API).
+# Open http://localhost:8080 after `docker compose up --build`.
+#
+# Before first run (or after pulling new migrations), apply DB schema from the host:
+#   docker compose run --rm api poetry run alembic upgrade head
+#
+# Optional: SECRET_KEY=... docker compose up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+      POSTGRES_DB: finance
+    volumes:
+      - finance_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance -d finance"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./fin-backend
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://finance:finance@postgres:5432/finance
+      SECRET_KEY: ${SECRET_KEY:-docker-dev-only-change-for-production-min-32-chars}
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./fin-front
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  finance_pg_data:
