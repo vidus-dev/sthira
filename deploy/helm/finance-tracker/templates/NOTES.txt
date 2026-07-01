@@ -1,0 +1,30 @@
+{{ include "finance-tracker.fullname" . }} deployed.
+
+Components:
+  • API  : {{ include "finance-tracker.apiImage" . }}
+  • Web  : {{ include "finance-tracker.webImage" . }}
+  • Migrations Job: {{ if .Values.migrations.enabled }}enabled (runs on install/upgrade){{ else }}disabled{{ end }}
+
+{{- if .Values.ingress.enabled }}
+
+Reach the app:
+  https://{{ .Values.ingress.host }}{{ .Values.ingress.webPath }}
+  API is served under {{ .Values.ingress.apiPath }} on the same host.
+{{- else }}
+
+Ingress is disabled. Port-forward to test:
+  kubectl port-forward svc/{{ include "finance-tracker.fullname" . }}-web 8080:{{ .Values.service.webPort }}
+  kubectl port-forward svc/{{ include "finance-tracker.fullname" . }}-api 8000:{{ .Values.service.apiPort }}
+{{- end }}
+
+{{- if and .Values.secret.create (not .Values.secret.existingSecret) (eq .Values.secret.data.SECRET_KEY "change-me-in-production-min-32-characters") }}
+
+WARNING: You are using the default SECRET_KEY. Set a real one via
+  --set secret.data.SECRET_KEY=... or reference an existing Secret with
+  --set secret.existingSecret=<name>. The API refuses to start in
+  ENVIRONMENT=production with the placeholder key.
+{{- end }}
+
+Check rollout:
+  kubectl rollout status deploy/{{ include "finance-tracker.fullname" . }}-api
+  kubectl rollout status deploy/{{ include "finance-tracker.fullname" . }}-web

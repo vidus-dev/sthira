@@ -1,0 +1,29 @@
+{{- if .Values.networkPolicy.enabled -}}
+# Restrict ingress to the API pods: only the web tier and the ingress controller
+# may reach :8000. Tighten/extend egress per your cluster's Postgres location.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "finance-tracker.fullname" . }}-api
+  labels:
+    {{- include "finance-tracker.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "finance-tracker.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "finance-tracker.selectorLabels" (dict "root" . "component" "web") | nindent 14 }}
+        # Allow the ingress controller namespace (label your ingress ns accordingly).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.containerPort }}
+{{- end }}

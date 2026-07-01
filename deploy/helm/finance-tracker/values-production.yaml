@@ -1,0 +1,43 @@
+# Production overlay. Apply with:
+#   helm upgrade --install finance ./deploy/helm/finance-tracker \
+#     -f deploy/helm/finance-tracker/values-production.yaml \
+#     --set secret.existingSecret=finance-app-secrets
+
+image:
+  apiTag: "0.1.0"
+  webTag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+api:
+  replicaCount: 3
+  env:
+    ENVIRONMENT: production
+    LOG_LEVEL: INFO
+    METRICS_ENABLED: "true"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+
+web:
+  replicaCount: 3
+
+# Never ship real secrets in values. Reference a Secret created out-of-band
+# (e.g. by External Secrets / Vault / sealed-secrets).
+secret:
+  create: false
+  existingSecret: finance-app-secrets
+
+ingress:
+  enabled: true
+  className: nginx
+  host: finance.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: finance-tracker-tls
+
+networkPolicy:
+  enabled: true

@@ -1,0 +1,115 @@
+# Default values for finance-tracker.
+# Override per environment with `-f values-<env>.yaml` or `--set`.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: vinayykkumar/finance-tracker
+  pullPolicy: IfNotPresent
+  # Tag defaults to .Chart.appVersion when blank.
+  apiTag: ""
+  webTag: ""
+  # Image names within the repository (registry/repository/<name>:<tag>).
+  apiName: api
+  webName: web
+
+imagePullSecrets: []
+
+# ---- API (FastAPI) ----
+api:
+  replicaCount: 2
+  containerPort: 8000
+  env:
+    ENVIRONMENT: production
+    LOG_LEVEL: INFO
+    METRICS_ENABLED: "true"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ---- Web (static SPA behind nginx) ----
+web:
+  replicaCount: 2
+  containerPort: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ---- Secrets ----
+# Provide values here only for non-prod. In production reference an existing
+# Secret (created out-of-band / via a secrets manager) by setting existingSecret.
+secret:
+  existingSecret: ""
+  # Used only when existingSecret is empty.
+  create: true
+  data:
+    SECRET_KEY: "change-me-in-production-min-32-characters"
+    DATABASE_URL: "postgresql+asyncpg://finance:finance@finance-postgres:5432/finance"
+
+# ---- Database ----
+# This chart expects an external/managed Postgres. The DATABASE_URL above (or your
+# existingSecret) must point at it. A pre-install/upgrade Job runs Alembic migrations.
+migrations:
+  enabled: true
+  backoffLimit: 3
+
+# ---- Networking ----
+service:
+  type: ClusterIP
+  apiPort: 8000
+  webPort: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  host: finance.example.com
+  tls:
+    enabled: false
+    secretName: finance-tracker-tls
+  # /v1 -> API, everything else -> web.
+  apiPath: /v1
+  webPath: /
+
+networkPolicy:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod-level hardening applied to all workloads.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
