@@ -1,113 +1,137 @@
-# Finance Tracker
+# Sthira
 
-A personal-finance platform built as a monorepo: a **React/Vite web app**, an
-**Expo React Native mobile app**, and a **FastAPI modular-monolith API** backed
-by PostgreSQL — shipped together with Docker Compose (nginx proxies `/v1` to the
-API).
+A personal-finance platform — **web**, **mobile**, and **API** in a single monorepo.
+Track accounts, transactions, budgets, and goals, with a double-entry ledger and
+account-to-account transfers.
 
-| Component | Path | Stack |
-|---|---|---|
-| Web | [`fin-front/`](./fin-front) | React 18, Vite, TypeScript, Tailwind, Vitest |
-| Mobile | [`fin-mobile/`](./fin-mobile) | Expo, React Native, React Navigation |
-| API | [`fin-backend/`](./fin-backend) | FastAPI, async SQLAlchemy 2.0, Alembic, Pydantic, Postgres |
+[![CI](https://github.com/vidus-dev/sthira/actions/workflows/ci.yml/badge.svg)](https://github.com/vidus-dev/sthira/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/vidus-dev/sthira/actions/workflows/codeql.yml/badge.svg)](https://github.com/vidus-dev/sthira/actions/workflows/codeql.yml)
+![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+
+## Overview
+
+Sthira is a modular monolith: a FastAPI service exposes a versioned `/v1` API over
+PostgreSQL, and two clients — a React/Vite web app and an Expo React Native app —
+consume it through a shared, generated type contract. The whole stack runs locally
+with a single `docker compose up`.
 
 ## Architecture
 
-The backend is a **modular monolith**: thin `v1` routers delegate to a
-service-per-module, which uses a repository-per-module over async SQLAlchemy
-models. Domain modules live under `fin-backend/app/modules/`
-(`accounts`, `transactions`, `budgets`, `goals`).
+```mermaid
+flowchart LR
+  W[Web · React/Vite] -->|/v1| N[nginx]
+  M[Mobile · Expo RN] -->|/v1| API
+  N -->|/v1| API[FastAPI · app/modules]
+  N -->|static| W
+  API --> DB[(PostgreSQL)]
+  API -.->|opt-in| O[OpenTelemetry / Prometheus]
+```
+
+The API follows a strict layering — a thin router delegates to a service, which
+uses a repository over the models:
 
 ```
 HTTP → router (app/api/v1) → service (app/modules/*/service.py)
      → repository (app/modules/*/repository.py) → model (app/models)
 ```
 
-Cross-cutting concerns:
+Domain modules live under `apps/api/app/modules/` (`accounts`, `transactions`,
+`budgets`, `goals`, `transfers`). See [`docs/architecture.md`](./docs/architecture.md)
+for the full picture and the [ADRs](./docs/adr/) for specific decisions.
 
-- **Request IDs** — every request carries an `X-Request-Id` (generated or echoed).
-- **Structured logging** — JSON logs with per-request context and latency (`app/observability`).
-- **Metrics & tracing** — Prometheus `/metrics`; opt-in OpenTelemetry tracing via `OTEL_EXPORTER_OTLP_ENDPOINT`.
-- **Security headers** — CSP, HSTS, X-Frame-Options, and more, on the API and nginx.
-- **Problem+JSON** — errors follow [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807).
-- **CSRF protection** — token required on authenticated mutating requests.
-- **Login throttling** — per-email failure rate limiting (in-memory or Redis).
-- **Idempotency** — `Idempotency-Key` support for transaction creation.
+## Tech stack
 
-### Typed API contract
+| Component | Path | Stack |
+|---|---|---|
+| Web | [`apps/web/`](./apps/web) | React 18, Vite, TypeScript, Tailwind, Vitest, Playwright |
+| Mobile | [`apps/mobile/`](./apps/mobile) | Expo, React Native, React Navigation |
+| API | [`apps/api/`](./apps/api) | FastAPI, async SQLAlchemy 2.0, Alembic, Pydantic, Postgres |
 
-The web/mobile clients generate their types from the server's OpenAPI schema, so
-they never drift from the API:
+## Repository structure
 
-```bash
-# Re-export the schema after changing the API, then regenerate client types
-cd fin-backend && poetry run python scripts/export_openapi.py
-cd ../fin-front && npm run gen:api-types
 ```
-
-`fin-front/src/lib/api/openapi.json` is the source of truth; CI fails if it is
-stale. Import domain types from `fin-front/src/lib/api/types.ts`.
-
-See [`docs/architecture-review.md`](./docs/architecture-review.md) and the
-[ADRs](./docs/adr/) for deeper context.
+.
+├── apps/
+│   ├── api/          # FastAPI modular monolith (Python / Poetry)
+│   ├── web/          # React + Vite + TypeScript web client
+│   └── mobile/       # Expo React Native app
+├── deploy/           # Helm chart + Kubernetes deploy runbook
+├── docs/             # architecture, development, deployment, ADRs, runbooks
+├── scripts/          # local dev helper scripts
+├── docker-compose.yml
+└── package.json      # npm workspaces (web, mobile)
+```
 
 ## Quick start (Docker)
 
 ```bash
-# Build and run Postgres + API + web
-docker compose up --build
-
-# First run (or after pulling new migrations): apply the schema
-docker compose run --rm api poetry run alembic upgrade head
+docker compose up --build            # Postgres + API + web
+docker compose run --rm api poetry run alembic upgrade head   # first run: apply schema
 ```
 
-Then open <http://localhost:8080>.
+Then open <http://localhost:8080> (nginx serves the web app and proxies `/v1` to the API).
 
 ## Local development
 
-### Backend (`fin-backend`)
+### API (`apps/api`)
 
 ```bash
-cd fin-backend
+cd apps/api
 poetry install --with dev
-poetry run alembic upgrade head        # requires a running Postgres
+poetry run alembic upgrade head       # requires a running Postgres
 poetry run uvicorn app.main:app --reload
 ```
 
-Run the checks:
+### Web (`apps/web`)
 
 ```bash
-poetry run ruff check app tests        # lint
-poetry run pytest                      # tests + coverage gate
+npm install
+npm run web                           # dev server
+npm run web:build                     # production build
 ```
 
-DB-backed integration tests under `tests/integration` (account-balance
-consistency, idempotency, and concurrency) are skipped automatically when no
-database is reachable. To run them, point `DATABASE_URL` at a migrated database:
+### Mobile (`apps/mobile`)
+
+```bash
+npm run mobile                        # Expo dev server
+```
+
+### Typed API contract
+
+The clients generate their types from the server's OpenAPI schema, so they never
+drift. After changing the API, re-export the schema and regenerate:
+
+```bash
+cd apps/api && poetry run python scripts/export_openapi.py
+cd ../web && npm run gen:api-types
+```
+
+`apps/web/src/lib/api/openapi.json` is the source of truth; CI fails if it is stale.
+
+## Testing
+
+```bash
+cd apps/api && poetry run pytest      # API: unit + integration (+ coverage floor)
+npm run test -w finance-tracking-app  # web: Vitest unit/component
+npm run test:e2e -w finance-tracking-app   # web: Playwright E2E (needs the stack up)
+```
+
+DB-backed integration tests under `apps/api/tests/integration` (balance consistency,
+idempotency, concurrency) are skipped when no database is reachable. To run them,
+point `DATABASE_URL` at a migrated database:
 
 ```bash
 DATABASE_URL=postgresql+asyncpg://finance:finance@localhost:5432/finance \
   poetry run pytest tests/integration
 ```
 
-### Web (`fin-front`)
-
-```bash
-npm install
-npm run web                            # dev server
-npm run web:build                      # production build
-```
-
-### Mobile (`fin-mobile`)
-
-```bash
-npm run mobile                         # Expo dev server
-```
-
 ## Configuration
 
 The API reads configuration from environment variables (see
-[`fin-backend/.env.example`](./fin-backend/.env.example)):
+[`apps/api/.env.example`](./apps/api/.env.example)):
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -115,32 +139,33 @@ The API reads configuration from environment variables (see
 | `SECRET_KEY` | `change-me` | Must be ≥32 chars and non-placeholder outside development |
 | `DATABASE_URL` | local Postgres | async (`postgresql+asyncpg://…`) |
 | `CORS_ORIGINS` | localhost | comma-separated allowlist |
+| `REDIS_URL` | — | optional; enables distributed login throttling |
 | `LOG_LEVEL` | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` |
+
+## Deployment
+
+A Helm chart (probes, HPA, PDBs, Ingress, pre-upgrade migration Job, non-root) lives
+under [`deploy/helm`](./deploy/helm). See [`docs/deployment.md`](./docs/deployment.md)
+and the [`deploy/README.md`](./deploy/README.md) runbook.
 
 ## Continuous integration
 
-GitHub Actions are **manual-only** — run them from the Actions tab or with
-`gh workflow run` (the security scans also run on a weekly schedule):
+Workflows are **manual** (`workflow_dispatch`) — run them from the Actions tab or
+with `gh workflow run`:
 
-- **CI** ([`ci.yml`](./.github/workflows/ci.yml)) — web lint/test/build, mobile
-  typecheck, API ruff + pytest (with a coverage floor), and a Docker Compose build.
-  Trigger manually (`gh workflow run CI`).
-- **CodeQL** ([`codeql.yml`](./.github/workflows/codeql.yml)) — static security
-  analysis for Python and JavaScript/TypeScript; manual plus a weekly scheduled scan.
-- **Security** ([`security.yml`](./.github/workflows/security.yml)) — gitleaks
-  secret scanning, Trivy vulnerability scanning, and SBOM generation; manual plus a
-  weekly scheduled scan.
-- **Release** ([`release.yml`](./.github/workflows/release.yml)) — on `v*.*.*`
-  tags, publishes API and web images to GHCR with provenance + SBOM.
-- **Dependabot** keeps dependencies patched.
+- **CI** — web lint/test/build, mobile typecheck, API ruff + pytest (Postgres
+  service, coverage floor), Docker build, and Playwright E2E.
+- **CodeQL** — static security analysis for Python and JS/TS (manual + weekly).
+- **Security** — gitleaks, Trivy, and SBOM generation (manual + weekly).
+- **Release** — on `v*.*.*` tags, publishes API and web images to GHCR with SBOM.
 
-## Operations & governance
+## Documentation
 
+- Architecture: [`docs/architecture.md`](./docs/architecture.md) · [ADRs](./docs/adr/)
+- Development guide: [`docs/development.md`](./docs/development.md)
+- Deployment: [`docs/deployment.md`](./docs/deployment.md) · [`deploy/README.md`](./deploy/README.md)
 - Operations runbooks: [`docs/runbooks.md`](./docs/runbooks.md)
-- Branch-protection setup: [`docs/branch-protection.md`](./docs/branch-protection.md)
-- Contribution workflow: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Vulnerability disclosure: [`SECURITY.md`](./SECURITY.md)
-- Change history: [`CHANGELOG.md`](./CHANGELOG.md)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md) · Security policy: [`SECURITY.md`](./SECURITY.md)
 
 ## License
 
