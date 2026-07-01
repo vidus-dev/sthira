@@ -1,0 +1,31 @@
+# Root (monorepo)
+ex.md
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+.env.*.local
+
+# Python API
+fin-backend/.venv/
+fin-backend/__pycache__/
+fin-backend/**/__pycache__/
+fin-backend/.pytest_cache/
+fin-backend/.mypy_cache/
+fin-backend/*.egg-info/
+fin-backend/dist/
+fin-backend/.ruff_cache/
+
+# Web
+fin-front/node_modules/
+fin-front/dist/
+
+# Mobile
+fin-mobile/node_modules/
+fin-mobile/.expo/
+
+/mfeat
+/sample-examples
+/my-tasks

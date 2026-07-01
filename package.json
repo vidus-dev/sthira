@@ -1,0 +1,25 @@
+{
+  "name": "finance-monorepo",
+  "private": true,
+  "description": "Web (Vite), mobile (Expo), and Python API in one repository.",
+  "workspaces": [
+    "fin-front",
+    "fin-mobile"
+  ],
+  "scripts": {
+    "web": "npm run dev -w finance-tracking-app",
+    "web:build": "npm run build -w finance-tracking-app",
+    "mobile": "npm run start -w fin-mobile",
+    "mobile:android": "npm run android -w fin-mobile",
+    "check:postgres": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-postgres.ps1",
+    "dev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-backend.ps1",
+    "dev:web": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-frontend.ps1",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "ci:local": "npm ci && npm run lint -w finance-tracking-app && npm run test -w finance-tracking-app && npm run build -w finance-tracking-app && npm run typecheck -w fin-mobile"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
