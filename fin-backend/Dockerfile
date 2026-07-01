@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- builder: resolve deps into an isolated virtualenv ----
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
@@ -16,7 +16,7 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root --no-ansi
 
 # ---- runtime: minimal, non-root ----
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
