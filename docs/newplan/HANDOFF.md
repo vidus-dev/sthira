@@ -23,7 +23,7 @@ exact next steps. The other files in this folder go deeper on specific topics:
   an invite code.
 - **Done (Phase 1):** FastAPI backend (households, categories, monthly plan with
   10%/5%-of-salary items, summaries, CSV export) + a fully rebuilt Expo React Native app
-  in the approved "Onyx" design. 164 backend tests pass (88% coverage); mobile and web
+  in the approved "Onyx" design. 165 backend tests pass (88% coverage); mobile and web
   type-check; the owner tried it on their phone via Expo Go and approved it.
 - **Where:** branch **`phase-1-onyx`** on GitHub (`vidus-dev/sthira`), 4 commits on top of
   `main`. **Not merged, no PR opened yet.**
@@ -143,7 +143,9 @@ bcrypt · cookie sessions (Starlette `SessionMiddleware`) + CSRF header · Prome
 repository (optional) → models (app/models)`. Services take an **`Actor`**.
 
 ### 4.2 Auth and scoping
-- Session cookie `session` (14 days; `Secure` in staging/production). `POST
+- Session cookie `session`: `SESSION_MAX_AGE_DAYS` (default **180**), re-issued on every
+  response, so it's "signed out after 180 days without opening the app"; `Secure` in
+  staging/production. The phone app's lock (below) guards the long session. `POST
   /v1/auth/register|login` return `csrf_token`; every mutating `/v1` request with a
   session must send `X-CSRF-Token`. Login is throttled.
 - **`app/auth/actor.py` → `require_actor`** loads `(user_id, household_id)` for the session
@@ -240,7 +242,7 @@ Errors are `application/problem+json`: `ValueError`→400, `LookupError`/`NotFou
 `app/modules/errors.py`).
 
 ### 4.6 Tests and lint
-- `cd apps/api && poetry run pytest` (coverage floor 65%, currently **88.4%**, **164
+- `cd apps/api && poetry run pytest` (coverage floor 65%, currently **88.4%**, **165
   tests**). Integration tests need a migrated Postgres at `DATABASE_URL` and are skipped
   otherwise. `poetry run ruff check app tests`.
 - New tests: `tests/integration/test_households.py` (HTTP flow incl. invite/join),
@@ -283,7 +285,8 @@ Always add native packages with `npx expo install` (keeps SDK-compatible version
 | `api/client.ts` | One HTTP client (cookie + CSRF), typed `api.*` functions for every endpoint, `newRequestId()` for Idempotency-Key, `setUnauthorizedHandler`, CSV `getText` |
 | `api/types.ts` | DTOs mirroring the API |
 | `api/hooks.ts` | React Query client + hooks (`useAccounts` sorted oldest-first, `useCategories`, `useCategoryMap` incl. archived, `usePlanStatus`, `useMonthSummary`, `useMonthTransactions`, `useRecentTransactions`, …) and mutations. Ledger mutations invalidate accounts/transactions/summary/plan; create/delete are **optimistic** (instant UI, rollback on error); deleting a transfer removes both legs locally |
-| `auth/AuthContext.tsx` | session hydrate, sign in/up/out, `updateName`; on any 401 → back to sign-in; sign-up sets the onboarding flag |
+| `auth/AuthContext.tsx` + `auth/sessionCache.ts` | session hydrate, sign in/up/out, `updateName`; sign-up sets the onboarding flag. **Offline-first start:** the last user + CSRF token are remembered (AsyncStorage `sthira.session`), so launch opens Home at once and confirms with `/auth/session` in the background. Only a 401/403 or `authenticated:false` signs out (clears session, query cache, persisted cache); offline/timeouts/5xx keep you signed in |
+| `api/persist.ts` | React Query cache persisted to AsyncStorage `sthira.queryCache` (7 days, `buster` to invalidate shapes) via `PersistQueryClientProvider` in `App.tsx`; splash waits for the restore so Home shows last known numbers |
 | `core/config.ts` | `EXPO_PUBLIC_API_BASE_URL`, timeout |
 | `core/http/*` | fetch wrapper (timeouts, problem+json errors, 401 hook), CSRF store |
 | `core/format/money.ts` | Indian grouping by hand, `formatINR`, `splitMoney`, `compactINR`, keypad parsing |
@@ -300,7 +303,7 @@ Always add native packages with `npx expo install` (keeps SDK-compatible version
 | `features/categories/CategoriesScreen.tsx` | + editor sheet with icon grid |
 | `features/settings/*` | Settings, `SharingSheet` (invite/join), `exportEntries.ts` |
 | `features/onboarding/*` | first-run screen + AsyncStorage flag `sthira.onboardingFor` |
-| `features/lock/AppLock.tsx` | fingerprint/face lock (AsyncStorage `sthira.appLock`, relock after 60 s in background) |
+| `features/lock/AppLock.tsx` | App lock: fingerprint/face **or phone PIN/pattern** (`getEnrolledLevelAsync`, device fallback). **On by default** when the phone has any screen lock (`sthira.appLock` = "0" turns it off). Locks at launch only for a remembered sign-in (not right after typing the password), relocks after 60 s in background |
 | `features/shared.ts` | account/category labels & icons, `txTitle`, `memberName`, `firstName` |
 
 ### 5.3 Screens and behaviour
@@ -439,7 +442,8 @@ screens (Home, Add expense, Monthly plan, Insights).
 ## 10. Verification performed
 | What | How | Result |
 |---|---|---|
-| API | pytest (unit + Postgres integration) | 164 passed, 88.4% coverage |
+| API | pytest (unit + Postgres integration) | 165 passed, 88.4% coverage |
+| Offline-first start | Web preview + Playwright with the API stopped | Home in ~0.2 s with cached data, still Home after 32 s; cookie cleared → sign-in and cache wiped |
 | Migration 0005 | upgrade → downgrade → upgrade on a DB with existing users/data | clean; 24 users → 24 households, 0 orphan rows |
 | Container | `docker build` + run with `RUN_MIGRATIONS_ON_START=true ENVIRONMENT=production PORT=8100` | migrated, `/v1/health/live` OK |
 | Mobile | `tsc --noEmit` (strict) | 0 errors |
@@ -475,7 +479,9 @@ screens (Home, Add expense, Monthly plan, Insights).
 - Editing an account balance overwrites it (no adjusting entry/audit).
 - Web preview only: Rise entrance animations off; a button-inside-row warning was fixed by
   using visual `Pill`s.
-- Render free tier sleeps after ~15 min idle (first request ~1 min).
+- Render free tier sleeps after ~15 min idle (first request ~1 min). Mitigated by a
+  cron-job.org ping to `/v1/health/live` every 10 min (owner's account) and the app's
+  offline-first start.
 
 ---
 

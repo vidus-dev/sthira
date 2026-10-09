@@ -32,6 +32,15 @@ def test_full_app_constructs_with_auth_enabled() -> None:
     assert "/v1/transactions" in paths or any(p.startswith("/v1/") for p in paths)
 
 
+def test_session_cookie_lasts_180_days_by_default() -> None:
+    from starlette.middleware.sessions import SessionMiddleware
+
+    get_settings.cache_clear()
+    app = create_app(enable_auth=True)
+    session = next(m for m in app.user_middleware if m.cls is SessionMiddleware)
+    assert session.kwargs["max_age"] == 180 * 24 * 60 * 60
+
+
 def test_root_returns_service_metadata(client: TestClient) -> None:
     resp = client.get("/")
     assert resp.status_code == 200

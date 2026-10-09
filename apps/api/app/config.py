@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     otel_exporter_otlp_endpoint: str | None = None
     redis_url: str | None = None
+    # The session cookie is re-issued on every response, so this is "signed out after this
+    # many days without using the app". Long, because the phone app has its own lock.
+    session_max_age_days: int = Field(default=180, ge=1, le=400)
     environment: Literal["development", "staging", "production"] = Field(
         default="development",
         description=(

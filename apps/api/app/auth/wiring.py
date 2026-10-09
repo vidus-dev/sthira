@@ -26,7 +26,7 @@ def install_auth_stack(app: FastAPI) -> None:
         SessionMiddleware,
         secret_key=settings.secret_key,
         session_cookie="session",
-        max_age=14 * 24 * 60 * 60,
+        max_age=settings.session_max_age_days * 24 * 60 * 60,
         same_site=settings.session_same_site,
         https_only=settings.session_cookie_https_only,
     )

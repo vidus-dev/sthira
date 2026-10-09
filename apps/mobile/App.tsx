@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
-import { QueryClientProvider, focusManager } from "@tanstack/react-query";
+import { focusManager, useIsRestoring } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { useFonts, Geist_300Light, Geist_400Regular, Geist_500Medium, Geist_600SemiBold } from "@expo-google-fonts/geist";
 import { GeistMono_400Regular, GeistMono_500Medium } from "@expo-google-fonts/geist-mono";
 import * as SplashScreen from "expo-splash-screen";
@@ -9,6 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { queryClient } from "./src/api/hooks";
+import { persistOptions } from "./src/api/persist";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { QuickAddProvider } from "./src/features/add/QuickAddContext";
 import { AppLockProvider } from "./src/features/lock/AppLock";
@@ -36,7 +38,9 @@ function Navigation() {
     GeistMono_400Regular,
     GeistMono_500Medium,
   });
-  const ready = fontsLoaded && isHydrated;
+  // Wait for the on-device cache too, so Home opens with last known numbers, not skeletons.
+  const restoring = useIsRestoring();
+  const ready = fontsLoaded && isHydrated && !restoring;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
@@ -72,11 +76,11 @@ function Providers({ children }: { children: ReactNode }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <QueryClientProvider client={queryClient}>
+          <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
             <AuthProvider>
               <AppLockProvider>{children}</AppLockProvider>
             </AuthProvider>
-          </QueryClientProvider>
+          </PersistQueryClientProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

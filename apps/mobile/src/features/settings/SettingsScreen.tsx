@@ -123,7 +123,7 @@ export function SettingsScreen() {
             <Icon name="fingerprint" size={20} color={palette.text} />
             <View style={{ flex: 1 }}>
               <Txt variant="bodyMedium">App lock</Txt>
-              <Txt variant="caption">Ask for fingerprint when opening Sthira</Txt>
+              <Txt variant="caption">Fingerprint or phone PIN when opening Sthira</Txt>
             </View>
             <Toggle value={lock.enabled} onChange={(v) => void lock.setEnabled(v)} />
           </View>

@@ -29,7 +29,8 @@ import type { YearMonth } from "../core/format/dates";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1, refetchOnReconnect: true },
+    // gcTime matches the on-device cache age so persisted data isn't dropped early.
+    queries: { staleTime: 30_000, gcTime: 7 * 24 * 60 * 60 * 1000, retry: 1, refetchOnReconnect: true },
     mutations: { retry: 0 },
   },
 });

@@ -9,11 +9,13 @@ import {
 } from "react";
 import { api, setUnauthorizedHandler } from "../api/client";
 import { queryClient } from "../api/hooks";
+import { clearPersistedCache } from "../api/persist";
 import type { SessionResponse, SessionUser } from "../api/types";
 import { ApiError } from "../core/api/ApiError";
 import { isApiConfigured } from "../core/config";
-import { setCsrfToken } from "../core/http/csrfStore";
+import { getCsrfToken, setCsrfToken } from "../core/http/csrfStore";
 import { markOnboardingPending } from "../features/onboarding/flag";
+import { clearCachedSession, loadCachedSession, saveCachedSession } from "./sessionCache";
 
 type AuthContextValue = {
   user: SessionUser | null;
@@ -33,6 +35,19 @@ function applyCsrfFromSession(s: SessionResponse): void {
   else if (!s.authenticated) setCsrfToken(null);
 }
 
+/** Signed in: remember who, so the next launch opens straight to Home. */
+function rememberUser(user: SessionUser): void {
+  saveCachedSession(user, getCsrfToken());
+}
+
+/** Signed out for real: drop the session and everything cached for that user. */
+function forgetUser(): void {
+  setCsrfToken(null);
+  queryClient.clear();
+  clearPersistedCache();
+  clearCachedSession();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -46,19 +61,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const s = await api.auth.session();
       applyCsrfFromSession(s);
-      setUser(s.authenticated && s.user ? s.user : null);
+      if (s.authenticated && s.user) {
+        rememberUser(s.user);
+        setUser(s.user);
+      } else {
+        forgetUser();
+        setUser(null);
+      }
     } catch (e) {
-      // Offline at launch: stay signed out of the UI but keep the cookie for next time.
-      if (!(e instanceof ApiError) || e.status === 401 || e.status === 403) setCsrfToken(null);
-      setUser(null);
+      // Only the server saying "not signed in" signs you out. Offline, a slow server or a
+      // timeout keeps whoever was signed in (the cookie is still valid for next time).
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        forgetUser();
+        setUser(null);
+      }
     }
   }, []);
 
   // Session expired or the account was removed: go back to sign-in.
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      setCsrfToken(null);
-      queryClient.clear();
+      forgetUser();
       setUser(null);
     });
     return () => setUnauthorizedHandler(null);
@@ -67,6 +90,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const cached = await loadCachedSession();
+      if (cached) {
+        // Open straight away as the remembered user; confirm with the server in the background.
+        setCsrfToken(cached.csrf);
+        if (!cancelled) {
+          setUser(cached.user);
+          setIsHydrated(true);
+        }
+        void applySession();
+        return;
+      }
       await applySession();
       if (!cancelled) setIsHydrated(true);
     })();
@@ -79,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const s = await api.auth.login(email.trim(), password);
     applyCsrfFromSession(s);
     queryClient.clear();
+    if (s.authenticated && s.user) rememberUser(s.user);
     setUser(s.authenticated && s.user ? s.user : null);
   }, []);
 
@@ -87,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyCsrfFromSession(s);
     if (s.user) await markOnboardingPending(s.user.id);
     queryClient.clear();
+    if (s.authenticated && s.user) rememberUser(s.user);
     setUser(s.authenticated && s.user ? s.user : null);
   }, []);
 
@@ -96,13 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* best-effort */
     }
-    setCsrfToken(null);
-    queryClient.clear();
+    forgetUser();
     setUser(null);
   }, []);
 
   const updateName = useCallback(async (name: string) => {
     const updated = await api.auth.updateProfile(name.trim() || null);
+    rememberUser(updated);
     setUser(updated);
     await queryClient.invalidateQueries({ queryKey: ["household"] });
   }, []);
