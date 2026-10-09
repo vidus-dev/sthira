@@ -522,8 +522,11 @@ Done so far:
 
 Releasing changes afterwards:
 - API: push to the branch Render deploys → auto-deploy (migrations run on start).
-- App, JS-only: `cd apps/mobile && EXPO_PUBLIC_API_BASE_URL=https://sthira-api-oes4.onrender.com npx eas-cli@latest update --channel preview -m "<what changed>"`
-  (EXPO_PUBLIC_* vars are inlined at update time, so set it).
+- App, JS-only: `cd apps/mobile && npx eas-cli@latest update --channel preview --platform android --environment preview -m "<what changed>"`.
+  `EXPO_PUBLIC_API_BASE_URL` is stored as a plain-text EAS variable in the `preview`
+  environment (EXPO_PUBLIC_* values are inlined at update time; check
+  `dist/_expo/static/js/android/*.hbc` contains the Render URL). First update published
+  10 Oct 2026 (group `ecb2dc9f-69f3-46e1-84db-16ff45147fe0`).
 - App, native changes (new native module, SDK upgrade, permissions, icon/name) or a
   `version` bump in `app.json`: new `eas build` and reinstall. Bumping `version` changes
   the runtime version, so older APKs stop receiving updates.
