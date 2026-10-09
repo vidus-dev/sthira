@@ -4,6 +4,7 @@ export type JsonRequest = {
   path: string;
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
+  headers?: Record<string, string>;
   timeoutMs?: number;
 };
 
@@ -16,6 +17,8 @@ export function createJsonHttpClient(options: {
   credentials?: RequestCredentials;
   defaultTimeoutMs?: number;
   getExtraHeaders?: () => Record<string, string>;
+  /** Called when the server says the session is gone (401), e.g. it expired. */
+  onUnauthorized?: () => void;
 }): JsonHttpClient {
   const credentials = options.credentials ?? "include";
   const defaultTimeoutMs = options.defaultTimeoutMs ?? 25_000;
@@ -32,6 +35,7 @@ export function createJsonHttpClient(options: {
       const headers: Record<string, string> = {
         Accept: "application/json",
         ...(getExtraHeaders?.() ?? {}),
+        ...(req.headers ?? {}),
       };
       if (req.body !== undefined) {
         headers["Content-Type"] = "application/json";
@@ -52,9 +56,9 @@ export function createJsonHttpClient(options: {
         });
       } catch (e) {
         if (timeoutController.signal.aborted) {
-          throw new ApiError(0, "Request timed out");
+          throw new ApiError(0, "The server took too long to answer. Check your connection.");
         }
-        throw e;
+        throw new ApiError(0, "Can't reach the server. Check your internet connection.", e);
       } finally {
         clearTimeout(timer);
       }
@@ -64,6 +68,7 @@ export function createJsonHttpClient(options: {
       }
       const text = await res.text();
       if (!res.ok) {
+        if (res.status === 401 && !path.startsWith("/v1/auth/")) options.onUnauthorized?.();
         let parsed: unknown = text;
         try {
           parsed = text ? JSON.parse(text) : undefined;
