@@ -27,9 +27,11 @@ exact next steps. The other files in this folder go deeper on specific topics:
   type-check; the owner tried it on their phone via Expo Go and approved it.
 - **Where:** branch **`phase-1-onyx`** on GitHub (`vidus-dev/sthira`), 4 commits on top of
   `main`. **Not merged, no PR opened yet.**
-- **Next:** Phase 3 (host backend on Neon + Render) and Phase 4 (build/install APK with
-  EAS). Blocked only on the owner creating free accounts on neon.tech, render.com and
-  expo.dev. Then Phase 5 (real use), Phase 6 (SMS auto-detect), Phase 7 (AI assistant).
+- **Hosted (9 Oct 2026):** API live at <https://sthira-api-oes4.onrender.com> (Render free,
+  Singapore, deploys `phase-1-onyx` on every push) on Neon Postgres (Singapore, free).
+  Expo project **@vidus-ai/sthira**; first APK build started (see §12, Phase 4).
+- **Next:** owner installs the APK and uses it for 3–4 days (Phase 5), *then* merge
+  `phase-1-onyx` into `main` and switch Render to `main`. Later Phase 6 (SMS), Phase 7 (AI).
 
 ---
 
@@ -406,7 +408,7 @@ screens (Home, Add expense, Monthly plan, Insights).
   mobile type-check, API ruff + migrations + pytest + OpenAPI drift check, docker compose
   build, Playwright e2e. **Not run on this branch yet.**
 - `deploy/helm/finance-tracker` (Kubernetes) — not used.
-- Render/Neon/EAS not set up yet (Phase 3–4).
+- Hosting is set up — see §12 Phase 3/4 for the exact configuration.
 
 ---
 
@@ -451,8 +453,6 @@ screens (Home, Add expense, Monthly plan, Insights).
 
 ## 11. Known issues, limitations, tech debt
 - **Branch not merged**; no PR. CI never run on it.
-- `eas.json` `preview` profile has a **placeholder** `EXPO_PUBLIC_API_BASE_URL`
-  (`https://REPLACE-WITH-YOUR-RENDER-URL.onrender.com`) — set it in Phase 4.
 - Pre-existing: `README.md`, `docs/development.md`, `docs/deployment.md`, the `Makefile`
   and the CI e2e job run `docker compose run --rm api poetry run alembic upgrade head`, but
   the API image's runtime stage has **no poetry** (only the copied `.venv`). Use
@@ -481,7 +481,18 @@ screens (Home, Add expense, Monthly plan, Insights).
 
 ## 12. What's left — next steps in order
 
-### Phase 3 — host the backend (needs the owner's accounts)
+### Phase 3 — host the backend — **DONE 9 Oct 2026**
+Live: <https://sthira-api-oes4.onrender.com> (`/v1/health/ready` checks the DB).
+- Neon: project `sthira`, AWS Asia Pacific 1 (Singapore), branch `production`, database
+  `neondb`, role `neondb_owner`, **direct (unpooled)** connection.
+- Render: web service `sthira-api`, Docker, branch **`phase-1-onyx`** (switch to `main`
+  after merging), root `apps/api`, region Singapore, Free, health check
+  `/v1/health/live`, auto-deploy on commit. Env: `DATABASE_URL`
+  (`postgresql+asyncpg://…/neondb?ssl=require` — drop `sslmode` and `channel_binding`,
+  asyncpg rejects them), `SECRET_KEY` (generated), `ENVIRONMENT=production`,
+  `RUN_MIGRATIONS_ON_START=true`. Secrets live only in Render/Neon.
+
+Steps used (for redoing it elsewhere):
 1. Owner creates **neon.tech** (project "sthira", region Singapore/Mumbai) and
    **render.com** (sign in with GitHub) accounts.
 2. Neon connection string → change scheme to `postgresql+asyncpg://` and
@@ -492,14 +503,29 @@ screens (Home, Add expense, Monthly plan, Insights).
 4. Check `https://<name>.onrender.com/v1/health/live`; register the owner's real account.
 5. Decide free vs Starter (~$7/mo, no sleep).
 
-### Phase 4 — build and install the APK (needs expo.dev account)
-1. `npm i -g eas-cli`, `eas login` (owner), `cd apps/mobile && eas init` (links project id
-   into app.json).
-2. Put the Render URL into `eas.json` → `build.preview.env.EXPO_PUBLIC_API_BASE_URL`.
-3. `eas build -p android --profile preview` → install from the link on the phone (allow
-   "install unknown apps"). Later JS-only updates: `eas update --branch preview` (add
-   `expo-updates` first).
-4. Test on device: fingerprint lock, haptics, CSV share sheet, light mode, drag-to-close.
+### Phase 4 — build and install the APK — **build started 9 Oct 2026**
+Done so far:
+- Expo account `vidus-dev` (Google sign-in → log in with `npx eas-cli@latest login`,
+  browser flow; the old CLI's password prompt can't work). Project **@vidus-ai/sthira**
+  (owner `vidus-ai`, projectId `87e83b13-8d7d-47ee-936f-49efb3eeeb7b` in `app.json`).
+- `eas.json` `preview` → `EXPO_PUBLIC_API_BASE_URL=https://sthira-api-oes4.onrender.com`,
+  channel `preview`. `expo-updates` added; `runtimeVersion` policy `appVersion`;
+  `updates.url` set. Android keystore generated and stored by EAS (keep using EAS
+  credentials — a different key can't install over the existing app).
+- Build: `npx eas-cli@latest build -p android --profile preview`.
+
+Releasing changes afterwards:
+- API: push to the branch Render deploys → auto-deploy (migrations run on start).
+- App, JS-only: `cd apps/mobile && EXPO_PUBLIC_API_BASE_URL=https://sthira-api-oes4.onrender.com npx eas-cli@latest update --channel preview -m "<what changed>"`
+  (EXPO_PUBLIC_* vars are inlined at update time, so set it).
+- App, native changes (new native module, SDK upgrade, permissions, icon/name) or a
+  `version` bump in `app.json`: new `eas build` and reinstall. Bumping `version` changes
+  the runtime version, so older APKs stop receiving updates.
+
+Still to do:
+1. Install the APK on the owner's phone; sign up with the real email (hosted DB starts
+   empty; the demo account exists only locally).
+2. Test on device: fingerprint lock, haptics, CSV share sheet, light mode, drag-to-close.
 
 ### Phase 5 — real use
 Owner adds real accounts with today's balances, salary, monthly plan (templates), and

@@ -2,8 +2,12 @@
   "expo": {
     "name": "Sthira",
     "slug": "sthira",
+    "owner": "vidus-ai",
     "scheme": "sthira",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -21,7 +25,13 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +55,14 @@
         }
       ],
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "87e83b13-8d7d-47ee-936f-49efb3eeeb7b"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/87e83b13-8d7d-47ee-936f-49efb3eeeb7b"
+    }
   }
 }
