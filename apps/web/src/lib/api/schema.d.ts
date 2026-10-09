@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Profile */
+        patch: operations["update_profile_v1_auth_me_patch"];
+        trace?: never;
+    };
     "/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -100,6 +117,58 @@ export interface paths {
         put?: never;
         /** Logout */
         post: operations["logout_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Household */
+        get: operations["get_household_v1_household_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Household */
+        patch: operations["rename_household_v1_household_patch"];
+        trace?: never;
+    };
+    "/v1/household/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join Household */
+        post: operations["join_household_v1_household_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/household/invite-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Invite Code */
+        post: operations["rotate_invite_code_v1_household_invite_code_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -197,6 +266,42 @@ export interface paths {
         patch: operations["update_account_v1_accounts__account_id__patch"];
         trace?: never;
     };
+    "/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories */
+        get: operations["list_categories_v1_categories_get"];
+        put?: never;
+        /** Create Category */
+        post: operations["create_category_v1_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Category */
+        delete: operations["archive_category_v1_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Category */
+        patch: operations["update_category_v1_categories__category_id__patch"];
+        trace?: never;
+    };
     "/v1/transactions": {
         parameters: {
             query?: never;
@@ -232,6 +337,127 @@ export interface paths {
         head?: never;
         /** Update Transaction */
         patch: operations["update_transaction_v1_transactions__tx_id__patch"];
+        trace?: never;
+    };
+    "/v1/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Transfer */
+        post: operations["create_transfer_v1_transfers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/monthly-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Items */
+        get: operations["list_items_v1_monthly_payments_get"];
+        put?: never;
+        /** Create Item */
+        post: operations["create_item_v1_monthly_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/monthly-payments/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plan Status */
+        get: operations["plan_status_v1_monthly_payments_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/monthly-payments/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Item */
+        delete: operations["archive_item_v1_monthly_payments__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Item */
+        patch: operations["update_item_v1_monthly_payments__item_id__patch"];
+        trace?: never;
+    };
+    "/v1/monthly-payments/{item_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pay Item */
+        post: operations["pay_item_v1_monthly_payments__item_id__pay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/summary/month": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Month Summary */
+        get: operations["month_summary_v1_summary_month_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/export/transactions.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Transactions */
+        get: operations["export_transactions_v1_export_transactions_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/budgets": {
@@ -337,7 +563,7 @@ export interface components {
              * @default checking
              * @enum {string}
              */
-            account_type: "checking" | "savings" | "credit" | "investment";
+            account_type: "checking" | "savings" | "credit" | "cash" | "wallet" | "investment";
             /**
              * Currency
              * @default INR
@@ -357,6 +583,8 @@ export interface components {
              * @default false
              */
             is_default: boolean;
+            /** Owner User Id */
+            owner_user_id?: string | null;
         };
         /** AccountRead */
         AccountRead: {
@@ -370,6 +598,13 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+            /**
+             * Household Id
+             * Format: uuid
+             */
+            household_id: string;
+            /** Owner User Id */
+            owner_user_id: string | null;
             /** Display Name */
             display_name: string;
             /** Institution */
@@ -404,7 +639,7 @@ export interface components {
             /** Institution */
             institution?: string | null;
             /** Account Type */
-            account_type?: ("checking" | "savings" | "credit" | "investment") | null;
+            account_type?: ("checking" | "savings" | "credit" | "cash" | "wallet" | "investment") | null;
             /** Currency */
             currency?: string | null;
             /** Balance */
@@ -415,6 +650,8 @@ export interface components {
             color_token?: string | null;
             /** Is Default */
             is_default?: boolean | null;
+            /** Owner User Id */
+            owner_user_id?: string | null;
         };
         /** AdminUserRow */
         AdminUserRow: {
@@ -492,6 +729,11 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+            /**
+             * Household Id
+             * Format: uuid
+             */
+            household_id: string;
             /** Category Slug */
             category_slug: string;
             /** Year */
@@ -519,6 +761,74 @@ export interface components {
             limit_amount?: number | string | null;
             /** Currency */
             currency?: string | null;
+        };
+        /** CategoryCreate */
+        CategoryCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @default expense
+             * @enum {string}
+             */
+            kind: "expense" | "income";
+            /**
+             * Icon
+             * @default dots
+             */
+            icon: string;
+        };
+        /** CategoryRead */
+        CategoryRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Icon */
+            icon: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Is Archived */
+            is_archived: boolean;
+        };
+        /** CategoryTotal */
+        CategoryTotal: {
+            /** Slug */
+            slug: string;
+            /** Total */
+            total: string;
+            /** Count */
+            count: number;
+        };
+        /** CategoryUpdate */
+        CategoryUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Is Archived */
+            is_archived?: boolean | null;
+        };
+        /** DayTotal */
+        DayTotal: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Expense */
+            expense: string;
+            /** Income */
+            income: string;
         };
         /** FinancialGoalCreate */
         FinancialGoalCreate: {
@@ -570,6 +880,11 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+            /**
+             * Household Id
+             * Format: uuid
+             */
+            household_id: string;
             /** Name */
             name: string;
             /** Goal Kind */
@@ -621,6 +936,46 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HouseholdJoin */
+        HouseholdJoin: {
+            /** Invite Code */
+            invite_code: string;
+        };
+        /** HouseholdMember */
+        HouseholdMember: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string | null;
+        };
+        /** HouseholdRead */
+        HouseholdRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Currency */
+            currency: string;
+            /** Timezone */
+            timezone: string;
+            /** Invite Code */
+            invite_code: string;
+            /** Members */
+            members: components["schemas"]["HouseholdMember"][];
+        };
+        /** HouseholdUpdate */
+        HouseholdUpdate: {
+            /** Name */
+            name: string;
+        };
         /** LoginBody */
         LoginBody: {
             /**
@@ -630,6 +985,150 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** MemberTotal */
+        MemberTotal: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Expense */
+            expense: string;
+        };
+        /**
+         * MonthSummary
+         * @description Expenses and income exclude transfers between our own accounts.
+         */
+        MonthSummary: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Currency */
+            currency: string;
+            /** Days In Month */
+            days_in_month: number;
+            /** As Of Day */
+            as_of_day: number;
+            /** Income Total */
+            income_total: string;
+            /** Expense Total */
+            expense_total: string;
+            /** Net */
+            net: string;
+            /** Expense By Category */
+            expense_by_category: components["schemas"]["CategoryTotal"][];
+            /** Income By Category */
+            income_by_category: components["schemas"]["CategoryTotal"][];
+            /** By Day */
+            by_day: components["schemas"]["DayTotal"][];
+            /** By Member */
+            by_member: components["schemas"]["MemberTotal"][];
+            previous: components["schemas"]["PreviousMonth"];
+        };
+        /** MonthlyPaymentCreate */
+        MonthlyPaymentCreate: {
+            /** Name */
+            name: string;
+            /** Category Slug */
+            category_slug: string;
+            /**
+             * Amount Type
+             * @default fixed
+             * @enum {string}
+             */
+            amount_type: "fixed" | "percent" | "variable";
+            /** Amount */
+            amount?: number | string | null;
+            /** Percent */
+            percent?: number | string | null;
+            /** Base Category Slug */
+            base_category_slug?: string | null;
+            /** Default Account Id */
+            default_account_id?: string | null;
+            /** Due Day */
+            due_day?: number | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** MonthlyPaymentRead */
+        MonthlyPaymentRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Category Slug */
+            category_slug: string;
+            /** Amount Type */
+            amount_type: string;
+            /** Amount */
+            amount: string | null;
+            /** Percent */
+            percent: string | null;
+            /** Base Category Slug */
+            base_category_slug: string | null;
+            /** Default Account Id */
+            default_account_id: string | null;
+            /** Due Day */
+            due_day: number | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Notes */
+            notes: string | null;
+        };
+        /** MonthlyPaymentUpdate */
+        MonthlyPaymentUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category Slug */
+            category_slug?: string | null;
+            /** Amount Type */
+            amount_type?: ("fixed" | "percent" | "variable") | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Percent */
+            percent?: number | string | null;
+            /** Base Category Slug */
+            base_category_slug?: string | null;
+            /** Default Account Id */
+            default_account_id?: string | null;
+            /** Due Day */
+            due_day?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** MonthlyPlanStatus */
+        MonthlyPlanStatus: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Items */
+            items: components["schemas"]["PlanItemStatus"][];
+            /** Planned Total */
+            planned_total: string;
+            /** Paid Total */
+            paid_total: string;
+            /** Settled Count */
+            settled_count: number;
+            /** Total Count */
+            total_count: number;
+            /** Base Income */
+            base_income: {
+                [key: string]: string;
+            };
         };
         /** Page[AdminUserRow] */
         Page_AdminUserRow_: {
@@ -653,6 +1152,63 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** PayRequest */
+        PayRequest: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Amount */
+            amount?: number | string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+        };
+        /** PlanItemStatus */
+        PlanItemStatus: {
+            item: components["schemas"]["MonthlyPaymentRead"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "due" | "partial" | "paid" | "awaiting_income";
+            /** Due Amount */
+            due_amount: string | null;
+            /** Base Amount */
+            base_amount: string | null;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining */
+            remaining: string | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Payments */
+            payments: components["schemas"]["TransactionRead"][];
+        };
+        /** PreviousMonth */
+        PreviousMonth: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Expense Total */
+            expense_total: string;
+            /** Expense To Same Day */
+            expense_to_same_day: string;
+        };
+        /** ProfileUpdate */
+        ProfileUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+        };
         /** RegisterBody */
         RegisterBody: {
             /**
@@ -662,6 +1218,8 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+            /** Display Name */
+            display_name?: string | null;
         };
         /** SessionResponse */
         SessionResponse: {
@@ -697,6 +1255,18 @@ export interface components {
             occurred_at: string;
             /** Notes */
             notes?: string | null;
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "sms" | "ai";
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Monthly Payment Id */
+            monthly_payment_id?: string | null;
+            /** Period Month */
+            period_month?: string | null;
         };
         /** TransactionRead */
         TransactionRead: {
@@ -710,6 +1280,11 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+            /**
+             * Household Id
+             * Format: uuid
+             */
+            household_id: string;
             /**
              * Account Id
              * Format: uuid
@@ -733,6 +1308,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Transfer Id */
+            transfer_id?: string | null;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Monthly Payment Id */
+            monthly_payment_id?: string | null;
+            /** Period Month */
+            period_month?: string | null;
         };
         /** TransactionUpdate */
         TransactionUpdate: {
@@ -746,6 +1334,70 @@ export interface components {
             occurred_at?: string | null;
             /** Notes */
             notes?: string | null;
+            /** Monthly Payment Id */
+            monthly_payment_id?: string | null;
+            /** Period Month */
+            period_month?: string | null;
+        };
+        /** TransferCreate */
+        TransferCreate: {
+            /**
+             * Source Account Id
+             * Format: uuid
+             */
+            source_account_id: string;
+            /**
+             * Dest Account Id
+             * Format: uuid
+             */
+            dest_account_id: string;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Monthly Payment Id */
+            monthly_payment_id?: string | null;
+            /** Period Month */
+            period_month?: string | null;
+        };
+        /** TransferRead */
+        TransferRead: {
+            /**
+             * Transfer Id
+             * Format: uuid
+             */
+            transfer_id: string;
+            /**
+             * Source Account Id
+             * Format: uuid
+             */
+            source_account_id: string;
+            /**
+             * Dest Account Id
+             * Format: uuid
+             */
+            dest_account_id: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Debit Transaction Id */
+            debit_transaction_id?: string | null;
+            /** Credit Transaction Id */
+            credit_transaction_id?: string | null;
         };
         /** UserPublic */
         UserPublic: {
@@ -758,6 +1410,10 @@ export interface components {
              * @default user
              */
             role: string;
+            /** Display Name */
+            display_name?: string | null;
+            /** Household Id */
+            household_id?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -907,6 +1563,39 @@ export interface operations {
             };
         };
     };
+    update_profile_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPublic"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     logout_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -925,6 +1614,112 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+        };
+    };
+    get_household_v1_household_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdRead"];
+                };
+            };
+        };
+    };
+    rename_household_v1_household_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_household_v1_household_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdJoin"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_invite_code_v1_household_invite_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdRead"];
                 };
             };
         };
@@ -1256,10 +2051,145 @@ export interface operations {
             };
         };
     };
+    list_categories_v1_categories_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_category_v1_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_category_v1_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_v1_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_transactions_v1_transactions_get: {
         parameters: {
             query?: {
                 account_id?: string | null;
+                /** @description Inclusive lower bound on occurred_at */
+                start?: string | null;
+                /** @description Exclusive upper bound on occurred_at */
+                end?: string | null;
+                category_slug?: string | null;
+                monthly_payment_id?: string | null;
+                limit?: number | null;
             };
             header?: never;
             path?: never;
@@ -1413,6 +2343,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_transfer_v1_transfers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_items_v1_monthly_payments_get: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyPaymentRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_item_v1_monthly_payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonthlyPaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyPaymentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_status_v1_monthly_payments_status_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyPlanStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_item_v1_monthly_payments__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_item_v1_monthly_payments__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonthlyPaymentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyPaymentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_item_v1_monthly_payments__item_id__pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanItemStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    month_summary_v1_summary_month_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_transactions_v1_export_transactions_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every entry, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
         };

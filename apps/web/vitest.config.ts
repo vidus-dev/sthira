@@ -7,6 +7,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    // The mobile workspace uses React 19 and npm hoists it to the repo root; make every
+    // package in this app resolve the web app's own React 18.
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./"),
       "@components": path.resolve(__dirname, "./src/components"),
@@ -19,6 +22,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // Let Vite (and resolve.dedupe) handle Radix so it renders with this app's React.
+    server: { deps: { inline: [/@radix-ui\//] } },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // E2E specs live under e2e/ and run via Playwright, not Vitest.
     exclude: ["node_modules", "dist", "e2e"],

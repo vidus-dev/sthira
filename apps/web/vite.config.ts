@@ -6,6 +6,9 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    // The mobile workspace uses React 19 and npm hoists it to the repo root; make every
+    // package in this app resolve the web app's own React 18.
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./"),
       "@components": path.resolve(__dirname, "./src/components"),

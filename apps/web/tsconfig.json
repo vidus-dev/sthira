@@ -20,7 +20,11 @@
       "@app/*": ["src/app/*"],
       "@components/*": ["src/components/*"],
       "@features/*": ["src/features/*"],
-      "@lib/*": ["src/lib/*"]
+      "@lib/*": ["src/lib/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"]
     },
 
     /* Linting */
