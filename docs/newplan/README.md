@@ -6,6 +6,7 @@ with family (e.g. my wife) so we both see and add to the same accounts.
 
 | Doc | What's in it |
 |---|---|
+| [HANDOFF.md](HANDOFF.md) | **Start here** if you're picking the project up: everything built, done, verified and still to do |
 | [01-phase-1-core-app.md](01-phase-1-core-app.md) | Phase 1 features, data model, API, migration, screens, done-criteria |
 | [02-design-system-onyx.md](02-design-system-onyx.md) | The approved "Onyx" look: colours, type, components, motion, screen specs |
 | [03-run-host-install.md](03-run-host-install.md) | Phases 2–5: run on the laptop, put it online, install on both phones, daily use |
