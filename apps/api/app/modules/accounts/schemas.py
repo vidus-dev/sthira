@@ -5,7 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-AccountType = Literal["checking", "savings", "credit", "investment"]
+# checking = bank current account, savings = bank savings account, credit = credit card.
+AccountType = Literal["checking", "savings", "credit", "cash", "wallet", "investment"]
 
 
 class AccountCreate(BaseModel):
@@ -17,6 +18,7 @@ class AccountCreate(BaseModel):
     mask_last4: str | None = Field(default=None, max_length=4)
     color_token: str | None = Field(default=None, max_length=64)
     is_default: bool = False
+    owner_user_id: UUID | None = None  # None = joint
 
     @field_validator("currency")
     @classmethod
@@ -33,6 +35,7 @@ class AccountUpdate(BaseModel):
     mask_last4: str | None = Field(default=None, max_length=4)
     color_token: str | None = Field(default=None, max_length=64)
     is_default: bool | None = None
+    owner_user_id: UUID | None = None
 
     @field_validator("currency")
     @classmethod
@@ -43,6 +46,8 @@ class AccountUpdate(BaseModel):
 class AccountRead(BaseModel):
     id: UUID
     user_id: UUID
+    household_id: UUID
+    owner_user_id: UUID | None
     display_name: str
     institution: str | None
     account_type: str

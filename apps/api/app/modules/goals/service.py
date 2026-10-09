@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.actor import Actor
 from app.models.goal import FinancialGoal
 from app.modules.goals import calculator
 from app.modules.goals.repository import GoalRepository
@@ -26,6 +27,7 @@ class GoalService:
         return FinancialGoalRead(
             id=g.id,
             user_id=g.user_id,
+            household_id=g.household_id,
             name=g.name,
             goal_kind=g.goal_kind,
             currency=g.currency,
@@ -39,19 +41,20 @@ class GoalService:
             updated_at=g.updated_at,
         )
 
-    async def list_goals(self, user_id: UUID) -> list[FinancialGoalRead]:
-        rows = await self._repo.list_for_user(user_id)
+    async def list_goals(self, actor: Actor) -> list[FinancialGoalRead]:
+        rows = await self._repo.list_for_household(actor.household_id)
         return [self._to_read(r) for r in rows]
 
-    async def get_goal(self, user_id: UUID, goal_id: UUID) -> FinancialGoalRead | None:
-        g = await self._repo.get_for_user(user_id, goal_id)
+    async def get_goal(self, actor: Actor, goal_id: UUID) -> FinancialGoalRead | None:
+        g = await self._repo.get(actor.household_id, goal_id)
         return self._to_read(g) if g else None
 
-    async def create_goal(self, user_id: UUID, body: FinancialGoalCreate) -> FinancialGoalRead:
+    async def create_goal(self, actor: Actor, body: FinancialGoalCreate) -> FinancialGoalRead:
         if body.saved_amount > body.target_amount:
             raise ValueError("saved_amount cannot exceed target_amount")
         goal = FinancialGoal(
-            user_id=user_id,
+            user_id=actor.user_id,
+            household_id=actor.household_id,
             name=body.name,
             goal_kind=body.goal_kind,
             currency=body.currency,
@@ -66,9 +69,9 @@ class GoalService:
         return self._to_read(goal)
 
     async def update_goal(
-        self, user_id: UUID, goal_id: UUID, body: FinancialGoalUpdate
+        self, actor: Actor, goal_id: UUID, body: FinancialGoalUpdate
     ) -> FinancialGoalRead | None:
-        g = await self._repo.get_for_user(user_id, goal_id)
+        g = await self._repo.get(actor.household_id, goal_id)
         if g is None:
             return None
         data = body.model_dump(exclude_unset=True)
@@ -82,8 +85,8 @@ class GoalService:
         await self._session.refresh(g)
         return self._to_read(g)
 
-    async def delete_goal(self, user_id: UUID, goal_id: UUID) -> bool:
-        g = await self._repo.get_for_user(user_id, goal_id)
+    async def delete_goal(self, actor: Actor, goal_id: UUID) -> bool:
+        g = await self._repo.get(actor.household_id, goal_id)
         if g is None:
             return False
         await self._repo.delete(g)

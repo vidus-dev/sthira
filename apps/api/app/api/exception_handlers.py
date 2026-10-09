@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.problem import problem_body, problem_json_response
+from app.modules.errors import ConflictError
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +19,24 @@ def register_exception_handlers(app: FastAPI) -> None:
             request=request,
             status=status.HTTP_400_BAD_REQUEST,
             title="Bad request",
+            detail=str(exc),
+        )
+
+    @app.exception_handler(LookupError)
+    async def not_found_handler(request: Request, exc: LookupError) -> JSONResponse:
+        return problem_json_response(
+            request=request,
+            status=status.HTTP_404_NOT_FOUND,
+            title="Not found",
+            detail=str(exc),
+        )
+
+    @app.exception_handler(ConflictError)
+    async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
+        return problem_json_response(
+            request=request,
+            status=status.HTTP_409_CONFLICT,
+            title="Conflict",
             detail=str(exc),
         )
 

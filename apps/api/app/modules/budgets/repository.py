@@ -10,11 +10,11 @@ class BudgetRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_month(self, user_id: UUID, year: int, month: int) -> list[BudgetLine]:
+    async def list_month(self, household_id: UUID, year: int, month: int) -> list[BudgetLine]:
         r = await self._session.execute(
             select(BudgetLine)
             .where(
-                BudgetLine.user_id == user_id,
+                BudgetLine.household_id == household_id,
                 BudgetLine.year == year,
                 BudgetLine.month == month,
             )
@@ -22,21 +22,21 @@ class BudgetRepository:
         )
         return list(r.scalars().all())
 
-    async def get_for_user(self, user_id: UUID, budget_id: UUID) -> BudgetLine | None:
+    async def get(self, household_id: UUID, budget_id: UUID) -> BudgetLine | None:
         r = await self._session.execute(
             select(BudgetLine).where(
                 BudgetLine.id == budget_id,
-                BudgetLine.user_id == user_id,
+                BudgetLine.household_id == household_id,
             )
         )
         return r.scalar_one_or_none()
 
     async def find_composite(
-        self, user_id: UUID, category_slug: str, year: int, month: int
+        self, household_id: UUID, category_slug: str, year: int, month: int
     ) -> BudgetLine | None:
         r = await self._session.execute(
             select(BudgetLine).where(
-                BudgetLine.user_id == user_id,
+                BudgetLine.household_id == household_id,
                 BudgetLine.category_slug == category_slug,
                 BudgetLine.year == year,
                 BudgetLine.month == month,

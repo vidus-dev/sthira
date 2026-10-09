@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -11,6 +11,10 @@ class TransferCreate(BaseModel):
     amount: Decimal = Field(decimal_places=4, max_digits=19)
     description: str = Field(default="", max_length=512)
     occurred_at: datetime | None = None
+    # Moving money into a "bucket" account can settle a monthly plan item (e.g. setting
+    # aside the 10%); the outgoing leg is linked to it.
+    monthly_payment_id: UUID | None = None
+    period_month: date | None = None
 
 
 class TransferRead(BaseModel):
@@ -20,3 +24,5 @@ class TransferRead(BaseModel):
     amount: Decimal
     occurred_at: datetime
     created_at: datetime
+    debit_transaction_id: UUID | None = None
+    credit_transaction_id: UUID | None = None

@@ -41,6 +41,7 @@ class FinancialGoalUpdate(BaseModel):
 class FinancialGoalRead(BaseModel):
     id: UUID
     user_id: UUID
+    household_id: UUID
     name: str
     goal_kind: str
     currency: str

@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from typing import Literal, Self
 
@@ -55,10 +56,15 @@ class Settings(BaseSettings):
 
     @property
     def database_url_sync(self) -> str:
-        """Alembic / sync tools: use psycopg3 (installed) instead of default psycopg2."""
+        """Alembic / sync tools: use psycopg3 (installed) instead of default psycopg2.
+
+        asyncpg spells TLS as ``ssl=require`` (hosted Postgres such as Neon); libpq/psycopg
+        wants ``sslmode=require``.
+        """
         u = self.database_url
         if "+asyncpg" in u:
-            return u.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+            u = u.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+            u = re.sub(r"([?&])ssl=", r"\1sslmode=", u)
         return u
 
 

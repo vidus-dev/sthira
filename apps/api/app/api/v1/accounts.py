@@ -2,10 +2,10 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.session_user import require_session_user_id
+from app.auth.actor import Actor, require_actor
 from app.db.session import get_db
 from app.modules.accounts.schemas import AccountCreate, AccountRead, AccountUpdate
 from app.modules.accounts.service import AccountService
@@ -19,31 +19,28 @@ def get_account_service(db: AsyncSession = Depends(get_db)) -> AccountService:
 
 @router.get("", response_model=list[AccountRead])
 async def list_accounts(
-    request: Request,
+    actor: Actor = Depends(require_actor),
     svc: AccountService = Depends(get_account_service),
 ) -> list[AccountRead]:
-    uid = require_session_user_id(request)
-    return await svc.list_accounts(uid)
+    return await svc.list_accounts(actor)
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
 async def create_account(
-    request: Request,
     body: AccountCreate,
+    actor: Actor = Depends(require_actor),
     svc: AccountService = Depends(get_account_service),
 ) -> AccountRead:
-    uid = require_session_user_id(request)
-    return await svc.create(uid, body)
+    return await svc.create(actor, body)
 
 
 @router.get("/{account_id}", response_model=AccountRead)
 async def get_account(
-    request: Request,
     account_id: UUID,
+    actor: Actor = Depends(require_actor),
     svc: AccountService = Depends(get_account_service),
 ) -> AccountRead:
-    uid = require_session_user_id(request)
-    row = await svc.get(uid, account_id)
+    row = await svc.get(actor, account_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return row
@@ -51,13 +48,12 @@ async def get_account(
 
 @router.patch("/{account_id}", response_model=AccountRead)
 async def update_account(
-    request: Request,
     account_id: UUID,
     body: AccountUpdate,
+    actor: Actor = Depends(require_actor),
     svc: AccountService = Depends(get_account_service),
 ) -> AccountRead:
-    uid = require_session_user_id(request)
-    row = await svc.update(uid, account_id, body)
+    row = await svc.update(actor, account_id, body)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return row
@@ -65,11 +61,10 @@ async def update_account(
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
-    request: Request,
     account_id: UUID,
+    actor: Actor = Depends(require_actor),
     svc: AccountService = Depends(get_account_service),
 ) -> None:
-    uid = require_session_user_id(request)
-    ok = await svc.delete(uid, account_id)
+    ok = await svc.delete(actor, account_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")

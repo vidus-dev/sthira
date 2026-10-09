@@ -10,7 +10,7 @@ from app.db.base import Base
 
 
 class FinancialGoal(Base):
-    """Sinking-fund style goal (e.g. wedding, emergency) scoped to a user."""
+    """Sinking-fund style goal (e.g. wedding, emergency) shared by a household."""
 
     __tablename__ = "financial_goals"
 
@@ -20,6 +20,12 @@ class FinancialGoal(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("households.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

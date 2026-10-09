@@ -15,7 +15,11 @@ class BudgetLine(Base):
     __tablename__ = "budget_lines"
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "category_slug", "year", "month", name="uq_budget_user_cat_period"
+            "household_id",
+            "category_slug",
+            "year",
+            "month",
+            name="uq_budget_household_cat_period",
         ),
     )
 
@@ -25,6 +29,12 @@ class BudgetLine(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("households.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

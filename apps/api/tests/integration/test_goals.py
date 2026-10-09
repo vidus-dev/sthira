@@ -9,7 +9,7 @@ import pytest
 from app.modules.goals.schemas import FinancialGoalCreate, FinancialGoalUpdate
 from app.modules.goals.service import GoalService
 
-from tests.integration.conftest import create_user, make_sessionmaker, run
+from tests.integration.conftest import create_actor, make_sessionmaker, run
 
 
 def _create(name="Trip", target="1000", saved="0") -> FinancialGoalCreate:
@@ -21,9 +21,9 @@ def _create(name="Trip", target="1000", saved="0") -> FinancialGoalCreate:
 def test_create_goal_computes_progress() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id = await create_user(sm)
+        actor = await create_actor(sm)
         async with sm() as s:
-            goal = await GoalService(s).create_goal(user_id, _create(target="1000", saved="250"))
+            goal = await GoalService(s).create_goal(actor, _create(target="1000", saved="250"))
         assert goal.progress == Decimal("0.2500")
         # Open-ended goal (no target_date) -> no suggested contribution.
         assert goal.suggested_monthly_contribution is None
@@ -34,10 +34,10 @@ def test_create_goal_computes_progress() -> None:
 def test_create_goal_rejects_saved_over_target() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id = await create_user(sm)
+        actor = await create_actor(sm)
         with pytest.raises(ValueError, match="exceed target"):
             async with sm() as s:
-                await GoalService(s).create_goal(user_id, _create(target="100", saved="200"))
+                await GoalService(s).create_goal(actor, _create(target="100", saved="200"))
 
     run(scenario())
 
@@ -45,12 +45,12 @@ def test_create_goal_rejects_saved_over_target() -> None:
 def test_update_goal_persists_and_validates() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id = await create_user(sm)
+        actor = await create_actor(sm)
         async with sm() as s:
-            goal = await GoalService(s).create_goal(user_id, _create(target="1000", saved="0"))
+            goal = await GoalService(s).create_goal(actor, _create(target="1000", saved="0"))
         async with sm() as s:
             updated = await GoalService(s).update_goal(
-                user_id, goal.id, FinancialGoalUpdate(saved_amount=Decimal("500"))
+                actor, goal.id, FinancialGoalUpdate(saved_amount=Decimal("500"))
             )
         assert updated is not None
         assert updated.progress == Decimal("0.5000")
@@ -58,7 +58,7 @@ def test_update_goal_persists_and_validates() -> None:
         with pytest.raises(ValueError, match="exceed target"):
             async with sm() as s:
                 await GoalService(s).update_goal(
-                    user_id, goal.id, FinancialGoalUpdate(saved_amount=Decimal("2000"))
+                    actor, goal.id, FinancialGoalUpdate(saved_amount=Decimal("2000"))
                 )
 
     run(scenario())
@@ -67,13 +67,13 @@ def test_update_goal_persists_and_validates() -> None:
 def test_delete_goal() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id = await create_user(sm)
+        actor = await create_actor(sm)
         async with sm() as s:
-            goal = await GoalService(s).create_goal(user_id, _create())
+            goal = await GoalService(s).create_goal(actor, _create())
         async with sm() as s:
-            assert await GoalService(s).delete_goal(user_id, goal.id) is True
+            assert await GoalService(s).delete_goal(actor, goal.id) is True
         async with sm() as s:
-            assert await GoalService(s).get_goal(user_id, goal.id) is None
+            assert await GoalService(s).get_goal(actor, goal.id) is None
 
     run(scenario())
 
@@ -81,8 +81,8 @@ def test_delete_goal() -> None:
 def test_get_unknown_goal_returns_none() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id = await create_user(sm)
+        actor = await create_actor(sm)
         async with sm() as s:
-            assert await GoalService(s).get_goal(user_id, uuid.uuid4()) is None
+            assert await GoalService(s).get_goal(actor, uuid.uuid4()) is None
 
     run(scenario())

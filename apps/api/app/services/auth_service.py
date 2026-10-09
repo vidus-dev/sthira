@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.modules.households.service import create_household
 from app.schemas.auth import UserPublic
 
 
@@ -21,8 +22,20 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def create_user(db: AsyncSession, email: str, password: str) -> User:
-    user = User(email=email.lower(), hashed_password=hash_password(password))
+async def create_user(
+    db: AsyncSession, email: str, password: str, display_name: str | None = None
+) -> User:
+    """Create a user in a fresh household of their own (seeded with default categories).
+
+    A second person joins an existing household afterwards with its invite code.
+    """
+    household = await create_household(db)
+    user = User(
+        email=email.lower(),
+        hashed_password=hash_password(password),
+        display_name=display_name,
+        household_id=household.id,
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -39,7 +52,13 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> User | No
 
 
 def user_public(user: User) -> UserPublic:
-    return UserPublic(id=str(user.id), email=user.email, role=user.role)
+    return UserPublic(
+        id=str(user.id),
+        email=user.email,
+        role=user.role,
+        display_name=user.display_name,
+        household_id=str(user.household_id),
+    )
 
 
 async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:

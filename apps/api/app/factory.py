@@ -69,16 +69,26 @@ def create_app(*, enable_auth: bool = True) -> FastAPI:
         from app.api.v1 import accounts as accounts_v1
         from app.api.v1 import admin as admin_v1
         from app.api.v1 import budgets as budgets_v1
+        from app.api.v1 import categories as categories_v1
+        from app.api.v1 import export as export_v1
         from app.api.v1 import goals as goals_v1
+        from app.api.v1 import household as household_v1
+        from app.api.v1 import monthly_payments as monthly_payments_v1
+        from app.api.v1 import summary as summary_v1
         from app.api.v1 import transactions as transactions_v1
         from app.api.v1 import transfers as transfers_v1
         from app.auth.wiring import include_auth_routes
 
         include_auth_routes(v1)
+        v1.include_router(household_v1.router)
         v1.include_router(goals_v1.router)
         v1.include_router(accounts_v1.router)
+        v1.include_router(categories_v1.router)
         v1.include_router(transactions_v1.router)
         v1.include_router(transfers_v1.router)
+        v1.include_router(monthly_payments_v1.router)
+        v1.include_router(summary_v1.router)
+        v1.include_router(export_v1.router)
         v1.include_router(budgets_v1.router)
         v1.include_router(admin_v1.router)
     app.include_router(v1)

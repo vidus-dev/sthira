@@ -20,12 +20,21 @@ class FinancialAccount(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )  # who created it
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("households.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )  # whose account it is; NULL = joint
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
     account_type: Mapped[str] = mapped_column(
         String(32), nullable=False, default="checking"
-    )  # checking | savings | credit | investment
+    )  # checking | savings | credit | cash | wallet | investment
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     balance: Mapped[Decimal] = mapped_column(Numeric(19, 4), nullable=False, default=Decimal("0"))
     mask_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
@@ -38,7 +47,7 @@ class FinancialAccount(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    user = relationship("User", back_populates="financial_accounts")
+    user = relationship("User", back_populates="financial_accounts", foreign_keys=[user_id])
     transactions = relationship(
         "LedgerTransaction", back_populates="account", cascade="all, delete-orphan"
     )

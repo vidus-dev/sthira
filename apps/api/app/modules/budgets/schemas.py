@@ -31,6 +31,7 @@ class BudgetUpdate(BaseModel):
 class BudgetRead(BaseModel):
     id: UUID
     user_id: UUID
+    household_id: UUID
     category_slug: str
     year: int
     month: int

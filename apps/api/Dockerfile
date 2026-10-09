@@ -39,6 +39,7 @@ EXPOSE 8000
 
 # Liveness probe usable by Docker/Compose (k8s uses its own httpGet probes).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/health/live').status==200 else 1)"
+    CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:' + __import__('os').environ.get('PORT', '8000') + '/v1/health/live').status==200 else 1)"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set RUN_MIGRATIONS_ON_START=true to apply database migrations on every deploy.
+CMD ["sh", "scripts/start.sh"]

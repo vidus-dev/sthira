@@ -37,9 +37,9 @@ def _body(account_id: uuid.UUID, amount: str) -> TransactionCreate:
 def test_create_increases_balance() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="100")
+        actor, account_id = await create_user_and_account(sm, starting_balance="100")
         async with sm() as s:
-            await TransactionService(s).create(user_id, _body(account_id, "250.50"))
+            await TransactionService(s).create(actor, _body(account_id, "250.50"))
         assert await fetch_balance(sm, account_id) == Decimal("350.5000")
 
     run(scenario())
@@ -48,9 +48,9 @@ def test_create_increases_balance() -> None:
 def test_outflow_decreases_balance() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="100")
+        actor, account_id = await create_user_and_account(sm, starting_balance="100")
         async with sm() as s:
-            await TransactionService(s).create(user_id, _body(account_id, "-40"))
+            await TransactionService(s).create(actor, _body(account_id, "-40"))
         assert await fetch_balance(sm, account_id) == Decimal("60.0000")
 
     run(scenario())
@@ -59,13 +59,13 @@ def test_outflow_decreases_balance() -> None:
 def test_update_amount_adjusts_balance_by_delta() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="0")
+        actor, account_id = await create_user_and_account(sm, starting_balance="0")
         async with sm() as s:
-            tx = await TransactionService(s).create(user_id, _body(account_id, "100"))
+            tx = await TransactionService(s).create(actor, _body(account_id, "100"))
         # balance now 100; bump the transaction to 175 -> balance should be 175
         async with sm() as s:
             await TransactionService(s).update(
-                user_id, tx.id, TransactionUpdate(amount=Decimal("175"))
+                actor, tx.id, TransactionUpdate(amount=Decimal("175"))
             )
         assert await fetch_balance(sm, account_id) == Decimal("175.0000")
 
@@ -75,11 +75,11 @@ def test_update_amount_adjusts_balance_by_delta() -> None:
 def test_delete_reverses_balance() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="0")
+        actor, account_id = await create_user_and_account(sm, starting_balance="0")
         async with sm() as s:
-            tx = await TransactionService(s).create(user_id, _body(account_id, "80"))
+            tx = await TransactionService(s).create(actor, _body(account_id, "80"))
         async with sm() as s:
-            deleted = await TransactionService(s).delete(user_id, tx.id)
+            deleted = await TransactionService(s).delete(actor, tx.id)
         assert deleted is True
         assert await fetch_balance(sm, account_id) == Decimal("0.0000")
 
@@ -89,14 +89,14 @@ def test_delete_reverses_balance() -> None:
 def test_double_delete_does_not_double_count() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="0")
+        actor, account_id = await create_user_and_account(sm, starting_balance="0")
         async with sm() as s:
-            tx = await TransactionService(s).create(user_id, _body(account_id, "80"))
+            tx = await TransactionService(s).create(actor, _body(account_id, "80"))
         async with sm() as s:
-            assert await TransactionService(s).delete(user_id, tx.id) is True
+            assert await TransactionService(s).delete(actor, tx.id) is True
         # Second delete must be a no-op, not subtract 80 again.
         async with sm() as s:
-            assert await TransactionService(s).delete(user_id, tx.id) is False
+            assert await TransactionService(s).delete(actor, tx.id) is False
         assert await fetch_balance(sm, account_id) == Decimal("0.0000")
 
     run(scenario())
@@ -105,17 +105,17 @@ def test_double_delete_does_not_double_count() -> None:
 def test_idempotent_create_applies_once() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="0")
+        actor, account_id = await create_user_and_account(sm, starting_balance="0")
         key = str(uuid.uuid4())
         async with sm() as s:
             first = await TransactionService(s).create(
-                user_id, _body(account_id, "100"), idempotency_key=key
+                actor, _body(account_id, "100"), idempotency_key=key
             )
         # Replaying the same key must return the same transaction and NOT
         # apply the amount a second time.
         async with sm() as s:
             replay = await TransactionService(s).create(
-                user_id, _body(account_id, "100"), idempotency_key=key
+                actor, _body(account_id, "100"), idempotency_key=key
             )
         assert replay.id == first.id
         assert await fetch_balance(sm, account_id) == Decimal("100.0000")
@@ -126,10 +126,10 @@ def test_idempotent_create_applies_once() -> None:
 def test_create_unknown_account_raises() -> None:
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, _ = await create_user_and_account(sm)
+        actor, _ = await create_user_and_account(sm)
         with pytest.raises(ValueError, match="Account not found"):
             async with sm() as s:
-                await TransactionService(s).create(user_id, _body(uuid.uuid4(), "10"))
+                await TransactionService(s).create(actor, _body(uuid.uuid4(), "10"))
 
     run(scenario())
 
@@ -144,11 +144,11 @@ def test_concurrent_creates_keep_balance_consistent() -> None:
 
     async def scenario() -> None:
         sm = make_sessionmaker()
-        user_id, account_id = await create_user_and_account(sm, starting_balance="0")
+        actor, account_id = await create_user_and_account(sm, starting_balance="0")
 
         async def write(amount: str) -> None:
             async with sm() as s:
-                await TransactionService(s).create(user_id, _body(account_id, amount))
+                await TransactionService(s).create(actor, _body(account_id, amount))
 
         # Fan out many concurrent writers on the same account.
         amounts = ["10", "20", "30", "40", "50", "5", "15", "25"]

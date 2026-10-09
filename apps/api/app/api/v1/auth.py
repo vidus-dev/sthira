@@ -4,9 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.csrf_token import new_csrf_token
 from app.auth.login_throttle import clear_login_failures, is_login_throttled, record_login_failure
-from app.auth.session_user import session_user_id_optional
+from app.auth.session_user import require_session_user_id, session_user_id_optional
 from app.db.session import get_db
-from app.schemas.auth import LoginBody, RegisterBody, SessionResponse
+from app.schemas.auth import (
+    LoginBody,
+    ProfileUpdate,
+    RegisterBody,
+    SessionResponse,
+    UserPublic,
+)
 from app.services.auth_service import (
     authenticate,
     create_user,
@@ -43,7 +49,7 @@ async def register(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     try:
-        user = await create_user(db, body.email, body.password)
+        user = await create_user(db, body.email, body.password, body.display_name)
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered") from None
@@ -87,6 +93,23 @@ async def session(request: Request, db: AsyncSession = Depends(get_db)) -> Sessi
         return SessionResponse(authenticated=False, user=None, csrf_token=None)
     csrf = _ensure_csrf(request)
     return SessionResponse(authenticated=True, user=user_public(user), csrf_token=csrf)
+
+
+@router.patch("/me")
+async def update_profile(
+    request: Request,
+    body: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> UserPublic:
+    uid = require_session_user_id(request)
+    user = await get_user_by_id(db, uid)
+    if user is None:
+        request.session.clear()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if "display_name" in body.model_fields_set:
+        user.display_name = body.display_name
+    await db.commit()
+    return user_public(user)
 
 
 @router.post("/logout")

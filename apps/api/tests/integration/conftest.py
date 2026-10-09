@@ -61,40 +61,60 @@ def make_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def create_user_and_account(
-    sessionmaker: async_sessionmaker[AsyncSession], *, starting_balance: str = "0"
-) -> tuple[uuid.UUID, uuid.UUID]:
-    """Insert a throwaway user + account, returning their ids."""
+async def create_actor(
+    sessionmaker: async_sessionmaker[AsyncSession], *, household_id: uuid.UUID | None = None
+):
+    """Insert a throwaway user in a new household (or in ``household_id``); return an Actor."""
+    from app.auth.actor import Actor
+    from app.models.user import User
+    from app.modules.households.service import create_household
+
+    async with sessionmaker() as s:
+        if household_id is None:
+            household_id = (await create_household(s)).id
+        user = User(
+            email=f"itest-{uuid.uuid4()}@example.com",
+            hashed_password="x",  # not exercising auth here
+            household_id=household_id,
+        )
+        s.add(user)
+        await s.commit()
+        return Actor(user_id=user.id, household_id=household_id)
+
+
+async def create_account(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    actor,
+    *,
+    balance: str = "0",
+    name: str = "Integration Test Account",
+    currency: str = "INR",
+    account_type: str = "savings",
+) -> uuid.UUID:
     from decimal import Decimal
 
     from app.models.account import FinancialAccount
-    from app.models.user import User
 
-    user = User(
-        email=f"itest-{uuid.uuid4()}@example.com",
-        hashed_password="x",  # not exercising auth here
-    )
     account = FinancialAccount(
-        user=user,
-        display_name="Integration Test Account",
-        balance=Decimal(starting_balance),
+        user_id=actor.user_id,
+        household_id=actor.household_id,
+        display_name=name,
+        balance=Decimal(balance),
+        currency=currency,
+        account_type=account_type,
     )
     async with sessionmaker() as s:
-        s.add(user)
         s.add(account)
         await s.commit()
-        return user.id, account.id
+        return account.id
 
 
-async def create_user(sessionmaker: async_sessionmaker[AsyncSession]) -> uuid.UUID:
-    """Insert a throwaway user, returning its id."""
-    from app.models.user import User
-
-    user = User(email=f"itest-{uuid.uuid4()}@example.com", hashed_password="x")
-    async with sessionmaker() as s:
-        s.add(user)
-        await s.commit()
-        return user.id
+async def create_user_and_account(
+    sessionmaker: async_sessionmaker[AsyncSession], *, starting_balance: str = "0"
+):
+    """Insert a throwaway user + account; return (actor, account_id)."""
+    actor = await create_actor(sessionmaker)
+    return actor, await create_account(sessionmaker, actor, balance=starting_balance)
 
 
 async def fetch_balance(

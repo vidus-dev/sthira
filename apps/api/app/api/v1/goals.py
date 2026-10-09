@@ -1,10 +1,10 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.session_user import require_session_user_id
+from app.auth.actor import Actor, require_actor
 from app.db.session import get_db
 from app.modules.goals import calculator
 from app.modules.goals.schemas import (
@@ -24,34 +24,31 @@ def get_goal_service(db: AsyncSession = Depends(get_db)) -> GoalService:
 
 @router.get("", response_model=list[FinancialGoalRead])
 async def list_goals(
-    request: Request,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> list[FinancialGoalRead]:
-    uid = require_session_user_id(request)
-    return await svc.list_goals(uid)
+    return await svc.list_goals(actor)
 
 
 @router.post("", response_model=FinancialGoalRead, status_code=status.HTTP_201_CREATED)
 async def create_goal(
-    request: Request,
     body: FinancialGoalCreate,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> FinancialGoalRead:
-    uid = require_session_user_id(request)
     try:
-        return await svc.create_goal(uid, body)
+        return await svc.create_goal(actor, body)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get("/{goal_id}", response_model=FinancialGoalRead)
 async def get_goal(
-    request: Request,
     goal_id: UUID,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> FinancialGoalRead:
-    uid = require_session_user_id(request)
-    row = await svc.get_goal(uid, goal_id)
+    row = await svc.get_goal(actor, goal_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
     return row
@@ -59,12 +56,11 @@ async def get_goal(
 
 @router.get("/{goal_id}/plan", response_model=FinancialGoalPlan)
 async def get_goal_plan(
-    request: Request,
     goal_id: UUID,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> FinancialGoalPlan:
-    uid = require_session_user_id(request)
-    row = await svc.get_goal(uid, goal_id)
+    row = await svc.get_goal(actor, goal_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
 
@@ -89,14 +85,13 @@ async def get_goal_plan(
 
 @router.patch("/{goal_id}", response_model=FinancialGoalRead)
 async def update_goal(
-    request: Request,
     goal_id: UUID,
     body: FinancialGoalUpdate,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> FinancialGoalRead:
-    uid = require_session_user_id(request)
     try:
-        row = await svc.update_goal(uid, goal_id, body)
+        row = await svc.update_goal(actor, goal_id, body)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     if row is None:
@@ -106,11 +101,10 @@ async def update_goal(
 
 @router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_goal(
-    request: Request,
     goal_id: UUID,
+    actor: Actor = Depends(require_actor),
     svc: GoalService = Depends(get_goal_service),
 ) -> None:
-    uid = require_session_user_id(request)
-    ok = await svc.delete_goal(uid, goal_id)
+    ok = await svc.delete_goal(actor, goal_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")

@@ -1,4 +1,4 @@
-"""Persistence only — no business rules beyond ownership."""
+"""Persistence only — no business rules beyond household scoping."""
 
 from uuid import UUID
 
@@ -12,19 +12,19 @@ class GoalRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_for_user(self, user_id: UUID) -> list[FinancialGoal]:
+    async def list_for_household(self, household_id: UUID) -> list[FinancialGoal]:
         result = await self._session.execute(
             select(FinancialGoal)
-            .where(FinancialGoal.user_id == user_id)
+            .where(FinancialGoal.household_id == household_id)
             .order_by(FinancialGoal.created_at.desc())
         )
         return list(result.scalars().all())
 
-    async def get_for_user(self, user_id: UUID, goal_id: UUID) -> FinancialGoal | None:
+    async def get(self, household_id: UUID, goal_id: UUID) -> FinancialGoal | None:
         result = await self._session.execute(
             select(FinancialGoal).where(
                 FinancialGoal.id == goal_id,
-                FinancialGoal.user_id == user_id,
+                FinancialGoal.household_id == household_id,
             )
         )
         return result.scalar_one_or_none()

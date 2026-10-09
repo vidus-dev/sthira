@@ -54,3 +54,25 @@ def test_staging_accepts_long_random_secret() -> None:
     ):
         s = Settings()
         assert s.secret_key == long_key
+
+
+@pytest.mark.parametrize(
+    ("async_url", "sync_url"),
+    [
+        (
+            "postgresql+asyncpg://u:p@localhost:5432/db",
+            "postgresql+psycopg://u:p@localhost:5432/db",
+        ),
+        (
+            "postgresql+asyncpg://u:p@ep-x.aws.neon.tech/neondb?ssl=require",
+            "postgresql+psycopg://u:p@ep-x.aws.neon.tech/neondb?sslmode=require",
+        ),
+        (
+            "postgresql+asyncpg://u:p@h/db?application_name=sthira&ssl=require",
+            "postgresql+psycopg://u:p@h/db?application_name=sthira&sslmode=require",
+        ),
+    ],
+)
+def test_sync_url_for_migrations(async_url: str, sync_url: str) -> None:
+    with patch.dict(os.environ, {"DATABASE_URL": async_url}, clear=False):
+        assert Settings().database_url_sync == sync_url

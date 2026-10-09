@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.actor import Actor
 from app.models.budget import BudgetLine
 from app.modules.budgets.repository import BudgetRepository
 from app.modules.budgets.schemas import BudgetCreate, BudgetRead, BudgetUpdate
@@ -19,17 +20,17 @@ class BudgetService:
     def _to_read(self, b: BudgetLine) -> BudgetRead:
         return BudgetRead.model_validate(b)
 
-    async def list_month(self, user_id: UUID, year: int, month: int) -> list[BudgetRead]:
-        rows = await self._repo.list_month(user_id, year, month)
+    async def list_month(self, actor: Actor, year: int, month: int) -> list[BudgetRead]:
+        rows = await self._repo.list_month(actor.household_id, year, month)
         return [self._to_read(x) for x in rows]
 
-    async def get(self, user_id: UUID, budget_id: UUID) -> BudgetRead | None:
-        row = await self._repo.get_for_user(user_id, budget_id)
+    async def get(self, actor: Actor, budget_id: UUID) -> BudgetRead | None:
+        row = await self._repo.get(actor.household_id, budget_id)
         return self._to_read(row) if row else None
 
-    async def upsert(self, user_id: UUID, body: BudgetCreate) -> BudgetRead:
+    async def upsert(self, actor: Actor, body: BudgetCreate) -> BudgetRead:
         existing = await self._repo.find_composite(
-            user_id, body.category_slug, body.year, body.month
+            actor.household_id, body.category_slug, body.year, body.month
         )
         if existing:
             existing.limit_amount = body.limit_amount
@@ -39,7 +40,8 @@ class BudgetService:
             await self._session.refresh(existing)
             return self._to_read(existing)
         row = BudgetLine(
-            user_id=user_id,
+            user_id=actor.user_id,
+            household_id=actor.household_id,
             category_slug=body.category_slug,
             year=body.year,
             month=body.month,
@@ -55,8 +57,8 @@ class BudgetService:
             raise
         return self._to_read(row)
 
-    async def update(self, user_id: UUID, budget_id: UUID, body: BudgetUpdate) -> BudgetRead | None:
-        row = await self._repo.get_for_user(user_id, budget_id)
+    async def update(self, actor: Actor, budget_id: UUID, body: BudgetUpdate) -> BudgetRead | None:
+        row = await self._repo.get(actor.household_id, budget_id)
         if row is None:
             return None
         if body.limit_amount is not None:
@@ -68,8 +70,8 @@ class BudgetService:
         await self._session.refresh(row)
         return self._to_read(row)
 
-    async def delete(self, user_id: UUID, budget_id: UUID) -> bool:
-        row = await self._repo.get_for_user(user_id, budget_id)
+    async def delete(self, actor: Actor, budget_id: UUID) -> bool:
+        row = await self._repo.get(actor.household_id, budget_id)
         if row is None:
             return False
         await self._repo.delete(row)
