@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, setUnauthorizedHandler } from "../api/client";
+import { setOutboxUser } from "../api/outbox";
 import { queryClient } from "../api/hooks";
 import { clearPersistedCache } from "../api/persist";
 import type { SessionResponse, SessionUser } from "../api/types";
@@ -24,6 +25,10 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Forgotten password: recovery key + new password; signs in on success. */
+  resetPassword: (email: string, recoveryKey: string, newPassword: string) => Promise<void>;
+  /** Re-read the signed-in user (e.g. after creating a recovery key). */
+  setUserFields: (fields: Partial<SessionUser>) => void;
   refreshSession: () => Promise<void>;
   updateName: (name: string) => Promise<void>;
 };
@@ -126,6 +131,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(s.authenticated && s.user ? s.user : null);
   }, []);
 
+  const resetPassword = useCallback(async (email: string, recoveryKey: string, newPassword: string) => {
+    const s = await api.auth.resetPassword(email.trim(), recoveryKey.trim(), newPassword);
+    applyCsrfFromSession(s);
+    queryClient.clear();
+    if (s.authenticated && s.user) rememberUser(s.user);
+    setUser(s.authenticated && s.user ? s.user : null);
+  }, []);
+
+  const setUserFields = useCallback((fields: Partial<SessionUser>) => {
+    setUser((cur) => {
+      if (!cur) return cur;
+      const next = { ...cur, ...fields };
+      rememberUser(next);
+      return next;
+    });
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await api.auth.logout();
@@ -143,6 +165,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: ["household"] });
   }, []);
 
+  // Entries waiting on the phone go out for whoever is signed in.
+  useEffect(() => {
+    setOutboxUser(user?.id ?? null);
+  }, [user?.id]);
+
   const value = useMemo(
     () => ({
       user,
@@ -151,10 +178,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       register,
       signOut,
+      resetPassword,
+      setUserFields,
       refreshSession: applySession,
       updateName,
     }),
-    [user, isHydrated, signIn, register, signOut, applySession, updateName]
+    [user, isHydrated, signIn, register, signOut, resetPassword, setUserFields, applySession, updateName]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

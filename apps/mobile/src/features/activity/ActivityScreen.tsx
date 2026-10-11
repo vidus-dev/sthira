@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { RefreshControl, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAccounts, useCategoryMap, useHousehold, useMonthTransactions } from "../../api/hooks";
+import { useAccountsWithPending, useCategoryMap, useHousehold, useMonthTransactions, usePendingTransactions, withPending } from "../../api/hooks";
 import type { Transaction } from "../../api/types";
 import {
   currentMonth,
@@ -27,7 +27,7 @@ import { Money } from "../../ui/Money";
 import { PressableScale } from "../../ui/PressableScale";
 import { Txt } from "../../ui/Txt";
 import { useQuickAdd } from "../add/QuickAddContext";
-import { accountLabel, categoryIcon, categoryName, memberName, txTitle } from "../shared";
+import { accountLabel, categoryIcon, categoryName, isAdjustment, isLocalOnly, memberName, txTitle } from "../shared";
 
 type Filter = "all" | "expense" | "income" | "transfer";
 type Item =
@@ -65,12 +65,13 @@ export function ActivityScreen() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const txq = useMonthTransactions(month);
-  const { data: accounts = [] } = useAccounts();
+  const { data: accounts = [] } = useAccountsWithPending();
+  const pending = usePendingTransactions();
   const { data: household } = useHousehold();
   const categoryMap = useCategoryMap();
 
   const { items, stickyIndices, spent, received, moved } = useMemo(() => {
-    const rows = txq.data ?? [];
+    const rows = withPending(txq.data, pending, month);
     const legsByTransfer = new Map<string, Transaction[]>();
     for (const t of rows) {
       if (t.transfer_id) legsByTransfer.set(t.transfer_id, [...(legsByTransfer.get(t.transfer_id) ?? []), t]);
@@ -106,7 +107,9 @@ export function ActivityScreen() {
       const header = out[sticky[sticky.length - 1]] as Extract<Item, { type: "header" }>;
       const amount = toNumber(t.amount);
       if (t.transfer_id) movedTotal += Math.abs(amount);
-      else {
+      else if (isAdjustment(t)) {
+        // A balance correction isn't spending or income.
+      } else {
         if (amount < 0) {
           header.spent += -amount;
           spentTotal += -amount;
@@ -116,7 +119,7 @@ export function ActivityScreen() {
       out.push({ type: "row", key: t.id, tx: t, pair });
     }
     return { items: out, stickyIndices: sticky, spent: spentTotal, received: receivedTotal, moved: movedTotal };
-  }, [txq.data, filter, search, accounts, categoryMap]);
+  }, [txq.data, pending, month, filter, search, accounts, categoryMap]);
 
   const header = (
     <View style={{ paddingTop: insets.top + 14 }}>
@@ -220,7 +223,7 @@ export function ActivityScreen() {
               title={item.tx.transfer_id ? "Transfer" : txTitle(item.tx, categoryMap)}
               icon={categoryIcon(categoryMap, item.tx.category_slug)}
               category={categoryName(categoryMap, item.tx.category_slug)}
-              onPress={() => (item.tx.id.startsWith("optimistic") ? undefined : open({ edit: item.tx }))}
+              onPress={() => (isLocalOnly(item.tx) ? undefined : open({ edit: item.tx }))}
             />
           )
         }
@@ -258,14 +261,14 @@ function TxRow({
     : `${tx.description?.trim() && tx.description.trim() !== category ? `${category} · ` : ""}${accountName(tx.account_id)}`;
   return (
     <PressableScale onPress={onPress} scaleTo={0.985} style={{ paddingHorizontal: GUTTER }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 13, minHeight: 64, borderBottomWidth: 1, borderBottomColor: palette.hairline, opacity: tx.id.startsWith("optimistic") ? 0.6 : 1 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 13, minHeight: 64, borderBottomWidth: 1, borderBottomColor: palette.hairline, opacity: isLocalOnly(tx) ? 0.6 : 1 }}>
         <IconCircle name={icon} />
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
           <Txt variant="bodyMedium" numberOfLines={1}>
             {title}
           </Txt>
           <Txt variant="caption" numberOfLines={1}>
-            {subtitle}
+            {isLocalOnly(tx) ? `Waiting to sync · ${subtitle}` : subtitle}
           </Txt>
         </View>
         <View style={{ alignItems: "flex-end", gap: 4 }}>

@@ -5,13 +5,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../auth/AuthContext";
 import { AccountsScreen } from "../features/accounts/AccountsScreen";
 import { ActivityScreen } from "../features/activity/ActivityScreen";
-import { SignInScreen, SignUpScreen } from "../features/auth/AuthScreens";
+import { ForgotPasswordScreen, SignInScreen, SignUpScreen } from "../features/auth/AuthScreens";
+import { CatchUpScreen } from "../features/catchup/CatchUpScreen";
+import { ReconcileScreen } from "../features/catchup/ReconcileScreen";
 import { CategoriesScreen } from "../features/categories/CategoriesScreen";
 import { HomeScreen } from "../features/home/HomeScreen";
 import { InsightsScreen } from "../features/insights/InsightsScreen";
 import { ONBOARDING_KEY } from "../features/onboarding/flag";
 import { OnboardingScreen } from "../features/onboarding/OnboardingScreen";
-import { PlanItemsScreen } from "../features/plan/PlanItemsScreen";
 import { PlanScreen } from "../features/plan/PlanScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { usePalette } from "../theme/ThemeProvider";
@@ -75,13 +76,15 @@ export function RootNavigator() {
           <Stack.Screen name="Main" component={MainTabs} options={{ animation: "fade" }} />
           <Stack.Screen name="Accounts" component={AccountsScreen} />
           <Stack.Screen name="Categories" component={CategoriesScreen} />
-          <Stack.Screen name="PlanItems" component={PlanItemsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="CatchUp" component={CatchUpScreen} />
+          <Stack.Screen name="Reconcile" component={ReconcileScreen} />
         </>
       ) : (
         <>
           <Stack.Screen name="SignIn" component={SignInScreen} options={{ animation: "fade" }} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         </>
       )}
     </Stack.Navigator>

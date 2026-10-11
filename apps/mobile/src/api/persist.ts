@@ -19,6 +19,10 @@ export const persistOptions: Omit<PersistQueryClientOptions, "queryClient"> = {
   maxAge: CACHE_MAX_AGE,
   // Bump when cached data shapes change so old caches are dropped instead of misread.
   buster: "1",
+  dehydrateOptions: {
+    // SMS drafts are rebuilt from the inbox each time; never copy them into storage.
+    shouldDehydrateQuery: (q) => q.state.status === "success" && q.queryKey[0] !== "sms-drafts",
+  },
 };
 
 /** Forget everything cached for the signed-in user (sign-out, expired session). */

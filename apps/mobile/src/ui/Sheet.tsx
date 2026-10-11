@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, View, useWindowDimensions } from "react-native";
+import { Keyboard, Modal, Platform, Pressable, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -20,6 +20,25 @@ import { Txt } from "./Txt";
 
 const OPEN_SPRING = { damping: 30, stiffness: 280, mass: 0.9 };
 
+/**
+ * How much of the window the keyboard covers. Measured from the keyboard's top edge, so
+ * it is right whether or not the system also shrinks the window for the keyboard.
+ */
+function useKeyboardInset(windowHeight: number): number {
+  const [top, setTop] = useState<number | null>(null);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) =>
+      setTop(e.endCoordinates.screenY)
+    );
+    const hide = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => setTop(null));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return top === null ? 0 : Math.max(0, windowHeight - top);
+}
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -39,6 +58,7 @@ export function Sheet({ visible, onClose, title, headerRight, tall, children }: 
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const keyboard = useKeyboardInset(height);
   const reduce = useReducedMotion();
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -75,20 +95,19 @@ export function Sheet({ visible, onClose, title, headerRight, tall, children }: 
 
   if (!mounted) return null;
 
+  // The sheet always fits between the status bar and the keyboard; its content scrolls.
+  const room = height - keyboard - insets.top - 16;
+
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
           <Animated.View style={[{ position: "absolute", inset: 0, backgroundColor: palette.overlay }, backdrop]}>
             <Pressable accessibilityLabel="Close" style={{ flex: 1 }} onPress={onClose} />
           </Animated.View>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1, justifyContent: "flex-end" }}
-            pointerEvents="box-none"
-          >
+          <View style={{ flex: 1, justifyContent: "flex-end", paddingBottom: keyboard }} pointerEvents="box-none">
             <Animated.View
               style={[
-                { maxHeight: height - insets.top - 16, height: tall ? height - insets.top - 40 : undefined },
+                { maxHeight: room, height: tall ? Math.min(room, height - insets.top - 40) : undefined },
                 panel,
               ]}
             >
@@ -97,15 +116,17 @@ export function Sheet({ visible, onClose, title, headerRight, tall, children }: 
                 locations={[0, 0.4, 1]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0.4 }}
-                style={{ flex: tall ? 1 : undefined, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 1, paddingHorizontal: 1 }}
+                style={{ flex: tall ? 1 : undefined, flexShrink: 1, borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 1, paddingHorizontal: 1 }}
               >
                 <View
                   style={{
                     flex: tall ? 1 : undefined,
+                    flexShrink: 1,
                     backgroundColor: palette.surface,
                     borderTopLeftRadius: 29,
                     borderTopRightRadius: 29,
-                    paddingBottom: insets.bottom + 12,
+                    // The keyboard already covers the gesture bar.
+                    paddingBottom: keyboard ? 12 : insets.bottom + 12,
                   }}
                 >
                   <GestureDetector gesture={pan}>
@@ -143,11 +164,11 @@ export function Sheet({ visible, onClose, title, headerRight, tall, children }: 
                       ) : null}
                     </View>
                   </GestureDetector>
-                  {children}
+                  <View style={{ flex: tall ? 1 : undefined, flexShrink: 1 }}>{children}</View>
                 </View>
               </LinearGradient>
             </Animated.View>
-          </KeyboardAvoidingView>
+          </View>
       </GestureHandlerRootView>
     </Modal>
   );

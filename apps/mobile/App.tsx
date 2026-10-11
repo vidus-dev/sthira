@@ -10,14 +10,21 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { queryClient } from "./src/api/hooks";
+import { CrashReportSender, ErrorBoundary, installCrashHandler } from "./src/core/crash";
 import { persistOptions } from "./src/api/persist";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { QuickAddProvider } from "./src/features/add/QuickAddContext";
 import { AppLockProvider } from "./src/features/lock/AppLock";
+import { PrivacyScreen } from "./src/features/privacy/PrivacyScreen";
+import { ReminderScheduler } from "./src/features/reminders/Reminders";
+import { UpdateBanner } from "./src/features/updates/UpdateBanner";
+import { navigationRef } from "./src/navigation/ref";
+import { ToastHost } from "./src/ui/Toast";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ThemeProvider, usePalette } from "./src/theme/ThemeProvider";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+installCrashHandler();
 
 // Refetch when the app comes back to the foreground.
 focusManager.setEventListener((handleFocus) => {
@@ -62,10 +69,13 @@ function Navigation() {
   };
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} ref={navigationRef}>
       <QuickAddProvider>
         <RootNavigator />
+        <ReminderScheduler />
       </QuickAddProvider>
+      <UpdateBanner />
+      <ToastHost />
       <StatusBar style={palette.scheme === "dark" ? "light" : "dark"} />
     </NavigationContainer>
   );
@@ -76,11 +86,15 @@ function Providers({ children }: { children: ReactNode }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-            <AuthProvider>
-              <AppLockProvider>{children}</AppLockProvider>
-            </AuthProvider>
-          </PersistQueryClientProvider>
+          <ErrorBoundary>
+            <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+              <AuthProvider>
+                <CrashReportSender />
+                <PrivacyScreen />
+                <AppLockProvider>{children}</AppLockProvider>
+              </AuthProvider>
+            </PersistQueryClientProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

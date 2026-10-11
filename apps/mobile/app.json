@@ -4,7 +4,7 @@
     "slug": "sthira",
     "owner": "vidus-ai",
     "scheme": "sthira",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -23,14 +23,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.READ_SMS",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -54,7 +53,15 @@
           "faceIDPermission": "Unlock Sthira with Face ID."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#000000",
+          "defaultChannel": "reminders"
+        }
+      ]
     ],
     "extra": {
       "eas": {

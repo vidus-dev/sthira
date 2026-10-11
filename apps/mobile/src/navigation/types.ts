@@ -10,12 +10,14 @@ export type TabParamList = {
 export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
+  ForgotPassword: undefined;
   Onboarding: undefined;
   Main: NavigatorScreenParams<TabParamList> | undefined;
   Accounts: undefined;
   Categories: undefined;
-  PlanItems: undefined;
   Settings: undefined;
+  CatchUp: undefined;
+  Reconcile: undefined;
 };
 
 declare global {

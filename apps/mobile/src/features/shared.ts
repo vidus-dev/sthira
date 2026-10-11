@@ -19,14 +19,26 @@ export function accountLabel(a: Account | undefined | null, withMask = true): st
   return withMask && a.mask_last4 ? `${a.display_name} ••${a.mask_last4}` : a.display_name;
 }
 
+/** Not on the server yet (waiting in the outbox, or an optimistic placeholder). */
+export function isLocalOnly(tx: Transaction): boolean {
+  return tx.id.startsWith("pending-") || tx.id.startsWith("optimistic");
+}
+
+/** Balance corrections move a balance but are neither income nor spending. */
+export function isAdjustment(tx: Transaction): boolean {
+  return tx.category_slug === "adjustment";
+}
+
 export function categoryName(map: Map<string, Category>, slug: string): string {
   if (slug === "transfer") return "Transfer";
+  if (slug === "adjustment") return "Balance correction";
   if (slug === "uncategorized") return "Uncategorized";
   return map.get(slug)?.name ?? slug.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export function categoryIcon(map: Map<string, Category>, slug: string): string {
   if (slug === "transfer") return "swap";
+  if (slug === "adjustment") return "scale";
   return map.get(slug)?.icon ?? "dots";
 }
 

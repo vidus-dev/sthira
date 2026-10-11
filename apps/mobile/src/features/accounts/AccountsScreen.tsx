@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
-import { useAccounts, useDeleteAccount, useHousehold, useSaveAccount } from "../../api/hooks";
+import { useAccounts, useDeleteAccount, useHousehold, useReconcileAccount, useSaveAccount } from "../../api/hooks";
 import type { Account, AccountType } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
 import { ApiError } from "../../core/api/ApiError";
@@ -102,6 +102,7 @@ function AccountEditor({ editing, onClose }: { editing: { account?: Account } | 
   const { user } = useAuth();
   const { data: household } = useHousehold();
   const save = useSaveAccount();
+  const reconcile = useReconcileAccount();
   const remove = useDeleteAccount();
   const [account, setAccount] = useState<Account | undefined>(undefined);
   const [name, setName] = useState("");
@@ -137,6 +138,9 @@ function AccountEditor({ editing, onClose }: { editing: { account?: Account } | 
     // Credit cards: what you owe is a negative balance.
     const signed = isCard && Number(amount) > 0 ? `-${amount}` : amount;
     setError(null);
+    // A changed balance on an existing account is recorded as a correction entry, so
+    // the change stays visible in Activity instead of silently overwriting the number.
+    const balanceChanged = account && Math.abs(Number(signed) - toNumber(account.balance)) >= 0.005;
     try {
       await save.mutateAsync({
         id: account?.id,
@@ -145,10 +149,13 @@ function AccountEditor({ editing, onClose }: { editing: { account?: Account } | 
           institution: bank.trim() || null,
           account_type: type,
           mask_last4: last4 || null,
-          balance: signed,
+          ...(account ? {} : { balance: signed }),
           owner_user_id: owner,
         },
       });
+      if (account && balanceChanged) {
+        await reconcile.mutateAsync({ id: account.id, body: { balance: signed, as_spending: false } });
+      }
       tapHaptic("success");
       onClose();
     } catch (e) {
@@ -200,7 +207,7 @@ function AccountEditor({ editing, onClose }: { editing: { account?: Account } | 
           onChangeText={(t) => setBalance(t.replace(/[^0-9.]/g, ""))}
           keyboardType="decimal-pad"
           placeholder="0"
-          hint={account ? "Changing this corrects the balance without adding an entry." : "From here on, entries keep it up to date."}
+          hint={account ? "A change is saved as a balance correction. To count missing spending, use Catch up → Check balances." : "From here on, entries keep it up to date."}
         />
         {members.length > 1 ? (
           <View style={{ gap: 10 }}>
@@ -217,7 +224,7 @@ function AccountEditor({ editing, onClose }: { editing: { account?: Account } | 
             {error}
           </Txt>
         ) : null}
-        <Button size="lg" icon="check" label={account ? "Save changes" : "Add account"} loading={save.isPending} onPress={submit} />
+        <Button size="lg" icon="check" label={account ? "Save changes" : "Add account"} loading={save.isPending || reconcile.isPending} onPress={submit} />
       </ScrollView>
     </Sheet>
   );

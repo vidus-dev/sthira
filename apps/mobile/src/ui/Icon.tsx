@@ -280,6 +280,58 @@ const ICONS: Record<string, ReactElement> = {
       <Circle cx={17} cy={17} r={2.2} />
     </>
   ),
+  question: (
+    <>
+      <Circle cx={12} cy={12} r={8.5} />
+      <Path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7" />
+      <Path d="M12 17h.01" strokeWidth={2.4} />
+    </>
+  ),
+
+  // --- catch-up, reminders, security
+  scale: (
+    <>
+      <Path d="M12 4v16M8 20h8M5 7h14" />
+      <Path d="m5 7-2.5 6a2.5 2.5 0 0 0 5 0zM19 7l-2.5 6a2.5 2.5 0 0 0 5 0z" />
+    </>
+  ),
+  message: (
+    <>
+      <Path d="M4.5 5.5h15a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H10l-4.5 3.5v-3.5h-1a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z" />
+      <Path d="M8 10h8M8 13.5h5" />
+    </>
+  ),
+  bell: (
+    <>
+      <Path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" />
+      <Path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+    </>
+  ),
+  type: (
+    <>
+      <Rect x={3} y={6} width={18} height={12.5} rx={2.5} />
+      <Path d="M7 10h.01M10.5 10h.01M14 10h.01M17.5 10h.01M8 14.5h8" strokeWidth={2} />
+    </>
+  ),
+  key: (
+    <>
+      <Circle cx={8} cy={15} r={4} />
+      <Path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5M14 9l2 2" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <Path d="M3 3l18 18" />
+      <Path d="M10.6 5.6A9.9 9.9 0 0 1 12 5.5c5 0 8.5 4.5 9.5 6.5a14 14 0 0 1-3 3.8M6.6 6.9A14 14 0 0 0 2.5 12c1 2 4.5 6.5 9.5 6.5a9.7 9.7 0 0 0 4.5-1.1" />
+      <Path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
+  refresh: (
+    <>
+      <Path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+      <Path d="M19.5 4.5v4h-4" />
+    </>
+  ),
 };
 
 /** Icons offered when creating a category. */

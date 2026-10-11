@@ -4,14 +4,16 @@ import { useNavigation } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import {
-  useAccounts,
+  useAccountsWithPending,
   useCategoryMap,
   useHousehold,
+  useMonthPlan,
   useMonthSummary,
-  usePlanStatus,
+  usePendingTransactions,
   useRecentTransactions,
+  withPending,
 } from "../../api/hooks";
-import type { MonthSummary, MonthlyPlanStatus } from "../../api/types";
+import type { MonthPlan, MonthSummary } from "../../api/types";
 import {
   currentMonth,
   dayHeader,
@@ -38,7 +40,8 @@ import { Odometer } from "../../ui/Odometer";
 import { PressableScale } from "../../ui/PressableScale";
 import { Txt } from "../../ui/Txt";
 import { useQuickAdd } from "../add/QuickAddContext";
-import { accountLabel, categoryIcon, firstName, txTitle } from "../shared";
+import { useSmsDrafts } from "../sms/useSmsDrafts";
+import { accountLabel, categoryIcon, firstName, isLocalOnly, txTitle } from "../shared";
 
 /** Cumulative spend per day (index 0 = day 1) up to ``days``. */
 function cumulative(summary: MonthSummary | undefined, days: number): number[] {
@@ -52,10 +55,18 @@ function cumulative(summary: MonthSummary | undefined, days: number): number[] {
   return perDay.map((v) => (run += v));
 }
 
-function remainingDue(plan: MonthlyPlanStatus | undefined): number {
+/** Still to pay or set aside this month (bills and bucket moves). */
+function remainingDue(plan: MonthPlan | undefined): number {
   return (plan?.items ?? [])
-    .filter((s) => s.status !== "paid")
+    .filter((s) => s.status === "due" || s.status === "partial")
     .reduce((sum, s) => sum + toNumber(s.remaining ?? s.due_amount), 0);
+}
+
+/** Bills paid as spending (moves into buckets aren't spending). */
+function billsPaid(plan: MonthPlan | undefined): number {
+  return (plan?.items ?? [])
+    .filter((s) => s.kind === "bill" && !s.dest_account_id)
+    .reduce((sum, s) => sum + toNumber(s.paid_amount), 0);
 }
 
 export function HomeScreen() {
@@ -69,13 +80,15 @@ export function HomeScreen() {
   const prevMonth = shiftMonth(month, -1);
 
   const household = useHousehold();
-  const accounts = useAccounts();
+  const accounts = useAccountsWithPending();
+  const pending = usePendingTransactions();
   const summary = useMonthSummary(month);
   const prevSummary = useMonthSummary(prevMonth);
-  const plan = usePlanStatus(month);
+  const plan = useMonthPlan(month);
   const recent = useRecentTransactions();
   const categoryMap = useCategoryMap();
   const [refreshing, setRefreshing] = useState(false);
+  const smsWaiting = useSmsDrafts().data?.drafts.length ?? 0;
 
   const balance = useMemo(
     () => (accounts.data ?? []).reduce((sum, a) => sum + toNumber(a.balance), 0),
@@ -93,7 +106,7 @@ export function HomeScreen() {
     if (!s) return null;
     const current = cumulative(s, Math.max(1, s.as_of_day));
     const previous = prevSummary.data ? cumulative(prevSummary.data, prevSummary.data.days_in_month) : [];
-    const planPaid = toNumber(plan.data?.paid_total);
+    const planPaid = billsPaid(plan.data);
     const everyday = Math.max(0, spent - planPaid);
     const forecast = spent + due + (everyday / Math.max(1, s.as_of_day)) * (s.days_in_month - s.as_of_day);
     const lastMonthTotal = toNumber(prevSummary.data?.expense_total);
@@ -103,7 +116,7 @@ export function HomeScreen() {
   const upNext = useMemo(
     () =>
       (plan.data?.items ?? [])
-        .filter((i) => i.status !== "paid")
+        .filter((i) => i.status !== "paid" && i.status !== "tracking")
         .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"))
         .slice(0, 4),
     [plan.data]
@@ -142,13 +155,25 @@ export function HomeScreen() {
               <Txt variant="tag">{monoDate(new Date())}</Txt>
             </View>
           </View>
-          <PressableScale
-            accessibilityLabel="Settings"
-            onPress={() => nav.navigate("Settings")}
-            style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: palette.iconBorder, alignItems: "center", justifyContent: "center" }}
-          >
-            <Icon name="sliders" size={17} color={palette.text} />
-          </PressableScale>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <PressableScale
+              accessibilityLabel={smsWaiting ? `Catch up, ${smsWaiting} bank SMS to review` : "Catch up"}
+              onPress={() => nav.navigate("CatchUp")}
+              style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: palette.iconBorder, alignItems: "center", justifyContent: "center" }}
+            >
+              <Icon name="inbox" size={17} color={palette.text} />
+              {smsWaiting ? (
+                <View style={{ position: "absolute", top: 7, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: palette.due, borderWidth: 1.5, borderColor: palette.bg }} />
+              ) : null}
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Settings"
+              onPress={() => nav.navigate("Settings")}
+              style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: palette.iconBorder, alignItems: "center", justifyContent: "center" }}
+            >
+              <Icon name="sliders" size={17} color={palette.text} />
+            </PressableScale>
+          </View>
         </View>
       </Rise>
 
@@ -194,6 +219,27 @@ export function HomeScreen() {
           ))}
         </View>
       </Rise>
+
+      {plan.data?.exists && !plan.data.reviewed && plan.data.items.length > 0 ? (
+        <Rise delay={260} style={{ marginHorizontal: GUTTER, marginTop: 16 }}>
+          <PressableScale onPress={() => nav.navigate("Main", { screen: "Plan" })} scaleTo={0.985}>
+            <EdgeCard radius={18} padding={0} innerStyle={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 }}>
+              <Icon name="plan" size={19} color={palette.due} />
+              <View style={{ flex: 1 }}>
+                <Txt variant="bodyMedium" size={14}>
+                  {monthName(month)} plan ready
+                </Txt>
+                <Txt variant="caption" style={{ marginTop: 2 }}>
+                  {plan.data.needs_amount_count
+                    ? `${plan.data.needs_amount_count} ${plan.data.needs_amount_count === 1 ? "amount" : "amounts"} to fill`
+                    : "Check it once and tap Done"}
+                </Txt>
+              </View>
+              <Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />
+            </EdgeCard>
+          </PressableScale>
+        </Rise>
+      ) : null}
 
       {noAccounts ? (
         <Rise delay={300} style={{ marginHorizontal: GUTTER, marginTop: 18 }}>
@@ -285,18 +331,26 @@ export function HomeScreen() {
                   const soon = date ? daysFromToday(date) <= 7 : false;
                   const amount = i.remaining ?? i.due_amount;
                   return (
-                    <PressableScale key={i.item.id} onPress={() => nav.navigate("Main", { screen: "Plan" })} scaleTo={0.97}>
+                    <PressableScale key={i.id} onPress={() => nav.navigate("Main", { screen: "Plan" })} scaleTo={0.97}>
                       <EdgeCard radius={18} padding={0} innerStyle={{ width: 146, paddingVertical: 12, paddingHorizontal: 13 }}>
-                        <Txt variant="tag" tone={soon ? "due" : "muted"} size={9.5} numberOfLines={1}>
-                          {date ? `${monoDay(date)} · ${relativeDueTag(date)}` : i.status === "awaiting_income" ? "AFTER SALARY" : "THIS MONTH"}
+                        <Txt variant="tag" tone={soon || i.status === "needs_amount" ? "due" : "muted"} size={9.5} numberOfLines={1}>
+                          {i.status === "needs_amount"
+                            ? "AMOUNT TO FILL"
+                            : date
+                              ? `${monoDay(date)} · ${relativeDueTag(date)}`
+                              : i.status === "awaiting_income"
+                                ? "AFTER SALARY"
+                                : "THIS MONTH"}
                         </Txt>
                         <Txt variant="bodyMedium" size={14} numberOfLines={1} style={{ marginTop: 8 }}>
-                          {i.item.name}
+                          {i.name}
                         </Txt>
                         <Txt variant="label" tabular style={{ marginTop: 3 }} numberOfLines={1}>
                           {amount === null
-                            ? "Varies"
-                            : `${i.item.amount_type === "variable" ? "≈ " : ""}${formatINR(amount)}${i.item.amount_type === "percent" && i.item.percent ? ` · ${toNumber(i.item.percent)}%` : ""}`}
+                            ? i.last_month_amount
+                              ? `Last ${formatINR(i.last_month_amount)}`
+                              : "Varies"
+                            : `${i.dest_account_id ? "Move " : ""}${formatINR(amount)}${i.amount_type === "percent" && i.percent ? ` · ${toNumber(i.percent)}%` : ""}`}
                         </Txt>
                       </EdgeCard>
                     </PressableScale>
@@ -312,20 +366,24 @@ export function HomeScreen() {
             <Txt variant="label">See all</Txt>
           </PressableScale>
         </View>
-        {recent.data && recent.data.length === 0 ? (
+        {recent.data && recent.data.length === 0 && pending.length === 0 ? (
           <PressableScale onPress={() => open()} style={{ marginTop: 12 }}>
             <Txt variant="label">Nothing yet. Tap + to add your first expense.</Txt>
           </PressableScale>
         ) : null}
-        {(recent.data ?? []).slice(0, 6).map((tx) => {
+        {withPending(recent.data, pending.filter((t) => !t.id.endsWith("-in")))
+          .slice(0, 6)
+          .map((tx) => {
           const acc = accounts.data?.find((a) => a.id === tx.account_id);
+          const local = isLocalOnly(tx);
           return (
             <ListRow
               key={tx.id}
               icon={categoryIcon(categoryMap, tx.category_slug)}
               title={txTitle(tx, categoryMap)}
-              subtitle={`${dayHeader(new Date(tx.occurred_at))} · ${accountLabel(acc)}`}
-              onPress={() => (tx.id.startsWith("optimistic") ? undefined : open({ edit: tx }))}
+              subtitle={`${local ? "Waiting to sync" : dayHeader(new Date(tx.occurred_at))} · ${accountLabel(acc)}`}
+              dim={local}
+              onPress={() => (local ? undefined : open({ edit: tx }))}
               right={<Money value={tx.amount} signed tone={toNumber(tx.amount) > 0 ? "positive" : "text"} />}
             />
           );

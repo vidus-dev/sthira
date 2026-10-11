@@ -2,7 +2,12 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { Transaction } from "../../api/types";
 import { QuickAddSheet, type EntryKind } from "./QuickAddSheet";
 
-export type QuickAddOptions = { kind?: EntryKind; edit?: Transaction };
+export type QuickAddOptions = {
+  kind?: EntryKind;
+  edit?: Transaction;
+  /** Start filled in, e.g. a bucket top-up: transfer ₹5,600 into account 1234. */
+  prefill?: { amount?: number; accountId?: string; destId?: string; note?: string };
+};
 
 type Ctx = { open: (opts?: QuickAddOptions) => void };
 

@@ -1,0 +1,7 @@
+{
+  "name": "sms-inbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reads bank alert SMS from the Android inbox (Sthira's own module).",
+  "main": "index.ts"
+}

@@ -1,84 +1,99 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { useCategoryMap, usePlanStatus } from "../../api/hooks";
-import type { PlanItemStatus } from "../../api/types";
-import { currentMonth, daysFromToday, monoDay, monthName, parseDay, sameMonth, type YearMonth } from "../../core/format/dates";
+import { api } from "../../api/client";
+import { useAccounts, useCategoryMap, useMonthPlan, usePlanAction } from "../../api/hooks";
+import type { PlanLine } from "../../api/types";
+import { currentMonth, dayHeader, daysFromToday, monoDay, parseDay, sameMonth, shiftMonth, type YearMonth } from "../../core/format/dates";
 import { formatINR, toNumber } from "../../core/format/money";
 import { usePalette } from "../../theme/ThemeProvider";
 import { GUTTER } from "../../theme/tokens";
 import { BezelDial, GrowBar } from "../../ui/charts";
-import { Button, Pill } from "../../ui/controls";
+import { Button, Chip, Pill } from "../../ui/controls";
 import { EdgeCard } from "../../ui/EdgeCard";
 import { Icon } from "../../ui/Icon";
 import { EmptyState, Rise, Screen, SectionLabel, Skeleton } from "../../ui/layout";
 import { IconCircle, ListRow } from "../../ui/ListRow";
 import { Money } from "../../ui/Money";
-import { PressableScale } from "../../ui/PressableScale";
+import { PressableScale, tapHaptic } from "../../ui/PressableScale";
 import { Txt } from "../../ui/Txt";
 import { useQuickAdd } from "../add/QuickAddContext";
 import { MonthSwitcher } from "../activity/ActivityScreen";
 import { categoryIcon } from "../shared";
-import { PaySheet } from "./PaySheet";
+import { LineEditor, type EditorTarget } from "./LineEditor";
+import { LineSheet } from "./LineSheet";
+import { amountText, monthWord, SUGGESTIONS } from "./planText";
+import { SalarySheet } from "./SalarySheet";
+
+const byDue = (a: PlanLine, b: PlanLine) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.sort_order - b.sort_order;
 
 export function PlanScreen() {
   const palette = usePalette();
-  const nav = useNavigation();
   const { open } = useQuickAdd();
   const [month, setMonth] = useState<YearMonth>(currentMonth());
-  const plan = usePlanStatus(month);
+  const plan = useMonthPlan(month);
+  const action = usePlanAction(month);
   const categoryMap = useCategoryMap();
-  const [paying, setPaying] = useState<PlanItemStatus | null>(null);
+  const { data: accounts = [] } = useAccounts();
+  const [tapped, setTapped] = useState<PlanLine | null>(null);
+  const [editing, setEditing] = useState<EditorTarget>(null);
+  const [salaryOpen, setSalaryOpen] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
 
+  const p = plan.data;
+  const now = currentMonth();
+  const isCurrent = sameMonth(month, now);
+  const canPlan = sameMonth(month, now) || sameMonth(month, shiftMonth(now, 1)) || (month.year * 12 + month.month < now.year * 12 + now.month && Boolean(p?.exists));
+  const name = monthWord(month.year, month.month);
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.display_name ?? "";
+
   const groups = useMemo(() => {
-    const items = plan.data?.items ?? [];
-    const byDate = (a: PlanItemStatus, b: PlanItemStatus) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999");
+    const items = p?.items ?? [];
+    const bills = items.filter((i) => i.kind === "bill");
     return {
-      due: items.filter((i) => i.status === "due" || i.status === "awaiting_income").sort(byDate),
-      partial: items.filter((i) => i.status === "partial").sort(byDate),
-      settled: items.filter((i) => i.status === "paid"),
+      toFill: items.filter((i) => i.status === "needs_amount"),
+      open: bills.filter((i) => ["due", "partial", "awaiting_income"].includes(i.status)).sort(byDue),
+      settled: bills.filter((i) => i.status === "paid"),
+      allowances: items.filter((i) => i.kind === "allowance" && i.status !== "needs_amount"),
     };
-  }, [plan.data]);
+  }, [p]);
 
-  const planned = toNumber(plan.data?.planned_total);
-  const paid = toNumber(plan.data?.paid_total);
-  const salary = toNumber(plan.data?.base_income?.salary);
-  const usesSalary = (plan.data?.items ?? []).some((i) => i.item.amount_type === "percent");
-  const dueThisWeek = groups.due.filter((i) => i.due_date && daysFromToday(parseDay(i.due_date)) <= 7).length;
-  const isCurrent = sameMonth(month, currentMonth());
+  // The dial only counts what there is to do (watched allowances aren't "settled").
+  const actionable = (p?.items ?? []).filter((i) => i.status !== "tracking");
+  const planned = actionable.reduce((s, i) => s + toNumber(i.due_amount), 0);
+  const done = toNumber(p?.done_total);
+  const dueThisWeek = groups.open.filter((i) => i.due_date && daysFromToday(parseDay(i.due_date)) <= 7).length;
+  const usesSalary = (p?.items ?? []).some((i) => i.amount_type === "percent");
+  const salary = toNumber(p?.salary.effective);
+  const shortBuckets = (p?.buckets ?? []).filter((b) => toNumber(b.short) > 0);
 
-  const subtitleFor = (s: PlanItemStatus) => {
+  const markReviewed = () => action.mutate(() => api.monthPlan.update(month.year, month.month, { reviewed: true }), { onSuccess: () => tapHaptic("success") });
+  const carry = (itemId: string, how: "move" | "done") => action.mutate(() => api.monthPlan.carry(month.year, month.month, itemId, how));
+
+  const billRow = (s: PlanLine) => {
     const date = s.due_date ? parseDay(s.due_date) : null;
-    const when = date ? `due ${monoDay(date).replace(/^0/, "")}` : null;
-    if (s.status === "awaiting_income") return "Waiting for this month's salary";
-    if (s.item.amount_type === "percent") return [`${toNumber(s.item.percent)}% of salary`, when].filter(Boolean).join(" · ");
-    if (s.item.amount_type === "variable") return [`Varies`, when].filter(Boolean).join(" · ");
-    return [`Fixed`, when].filter(Boolean).join(" · ");
-  };
-
-  const dueRow = (s: PlanItemStatus) => {
-    const date = s.due_date ? parseDay(s.due_date) : null;
-    const soon = date ? daysFromToday(date) <= 7 : false;
+    const soon = isCurrent && date ? daysFromToday(date) <= 7 : false;
+    const partial = s.status === "partial";
+    const sub = [
+      s.status === "awaiting_income" ? "Waiting for salary" : s.amount_type === "percent" ? `${toNumber(s.percent)}% of salary` : null,
+      partial ? `${formatINR(s.paid_amount)} of ${formatINR(s.due_amount)} paid` : null,
+      date ? `due ${monoDay(date).replace(/^0/, "")}` : null,
+      s.dest_account_id ? `→ ${accountName(s.dest_account_id)}` : null,
+    ].filter(Boolean).join(" · ");
     return (
       <ListRow
-        key={s.item.id}
-        icon={categoryIcon(categoryMap, s.item.category_slug)}
-        title={s.item.name}
+        key={s.id}
+        icon={categoryIcon(categoryMap, s.category_slug)}
+        title={s.name}
         subtitle={
-          <Txt variant="caption" tone={soon && isCurrent ? "due" : "muted"} numberOfLines={1}>
-            {subtitleFor(s)}
+          <Txt variant="caption" tone={soon ? "due" : "muted"} numberOfLines={1}>
+            {sub || (s.repeats ? "Every month" : "Only this month")}
           </Txt>
         }
-        onPress={() => setPaying(s)}
+        onPress={() => setTapped(s)}
         right={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {s.due_amount !== null && s.status !== "awaiting_income" ? <Money value={s.due_amount} /> : null}
-            {s.status === "awaiting_income" ? null : s.item.amount_type === "variable" ? (
-              <Pill variant="outline" label="Enter bill" />
-            ) : (
-              <Pill label="Pay" />
-            )}
+            {s.status === "awaiting_income" ? null : <Money value={partial ? s.remaining : s.due_amount} />}
+            {s.status === "awaiting_income" ? null : <Pill label={s.dest_account_id ? "Move" : "Pay"} />}
           </View>
         }
       />
@@ -98,47 +113,100 @@ export function PlanScreen() {
         <View style={{ alignItems: "center", marginTop: 30 }}>
           <Skeleton width={200} height={200} radius={100} />
         </View>
-      ) : (plan.data?.items.length ?? 0) === 0 ? (
+      ) : plan.isError ? (
+        <EmptyState icon="plan" title={`No plan for ${name}`} body="You can plan this month and next month." />
+      ) : !p?.exists ? (
+        <EmptyState icon="plan" title={`Nothing planned for ${name}`} body="This is before you started using Sthira." />
+      ) : p.items.length === 0 ? (
         <Rise delay={120}>
           <EmptyState
             icon="plan"
-            title="No monthly plan yet"
-            body="Add the payments you make every month — rent, EMI, internet, and 10% / 5% of salary."
-            action={<Button label="Set up the plan" icon="plus" onPress={() => nav.navigate("PlanItems")} />}
+            title={`Plan ${name}`}
+            body="Add what you pay or set aside every month. Next month starts with the same list."
+            action={<Button label="Add an item" icon="plus" onPress={() => setEditing({ draft: { name: "", category_slug: "other", kind: "bill", amount_type: "fixed", repeat: true } })} />}
           />
+          <Suggestions onPick={(d) => setEditing({ draft: d })} />
         </Rise>
       ) : (
         <>
+          {!p.reviewed && canPlan ? (
+            <Rise delay={60} style={{ marginHorizontal: GUTTER, marginTop: 18 }}>
+              <EdgeCard radius={18} padding={16}>
+                <Txt variant="section">{name} plan is ready</Txt>
+                <Txt variant="label" style={{ marginTop: 6, lineHeight: 19 }}>
+                  {p.needs_amount_count
+                    ? `${p.needs_amount_count} ${p.needs_amount_count === 1 ? "amount" : "amounts"} to fill. Change anything for ${name}, then tap Done.`
+                    : `Same as your usual list. Change anything for ${name}, then tap Done.`}
+                </Txt>
+                <Button label="Done" icon="check" size="sm" style={{ marginTop: 12, alignSelf: "flex-start" }} onPress={markReviewed} />
+              </EdgeCard>
+            </Rise>
+          ) : null}
+
+          {p.previous_unpaid.length ? (
+            <Rise delay={80} style={{ marginHorizontal: GUTTER, marginTop: 14 }}>
+              <EdgeCard radius={18} padding={14}>
+                <Txt variant="tag" tone="due" style={{ letterSpacing: 1.1 }}>
+                  LEFT FROM {monthWord(shiftMonth(month, -1).year, shiftMonth(month, -1).month).toUpperCase()}
+                </Txt>
+                {p.previous_unpaid.map((u) => (
+                  <View key={u.item_id} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Txt variant="bodyMedium" size={14} numberOfLines={1}>
+                        {u.name}
+                      </Txt>
+                      <Txt variant="caption" tabular>
+                        {formatINR(u.remaining)} unpaid
+                      </Txt>
+                    </View>
+                    <PressableScale onPress={() => carry(u.item_id, "move")} accessibilityLabel={`Move ${u.name} to ${name}`}>
+                      <Pill label={`Move to ${monthWord(month.year, month.month, false)}`} />
+                    </PressableScale>
+                    <PressableScale onPress={() => carry(u.item_id, "done")} accessibilityLabel={`Mark ${u.name} done`}>
+                      <Pill variant="outline" label="Done" />
+                    </PressableScale>
+                  </View>
+                ))}
+              </EdgeCard>
+            </Rise>
+          ) : null}
+
           <Rise delay={100} style={{ alignItems: "center", marginTop: 22 }}>
-            <BezelDial key={`${month.year}-${month.month}`} progress={planned > 0 ? paid / planned : 0}>
+            <BezelDial key={`${month.year}-${month.month}`} progress={planned > 0 ? Math.min(1, done / planned) : 0}>
               <Txt variant="tag" style={{ letterSpacing: 1.6 }}>
                 SETTLED
               </Txt>
-              <Money value={paid} size={30} weight="light" style={{ marginTop: 6 }} />
+              <Money value={done} size={30} weight="light" style={{ marginTop: 6 }} />
               <Txt variant="caption" tabular style={{ marginTop: 4 }}>
                 of {formatINR(planned)}
               </Txt>
-              <Txt variant="tag" tone={dueThisWeek && isCurrent ? "due" : "faint"} style={{ marginTop: 9, letterSpacing: 1 }}>
-                {groups.due.length + groups.partial.length === 0
-                  ? "ALL SETTLED"
-                  : dueThisWeek && isCurrent
-                    ? `${dueThisWeek} DUE THIS WEEK`
-                    : `${plan.data?.settled_count ?? 0} OF ${plan.data?.total_count ?? 0} PAID`}
+              <Txt variant="tag" tone={(dueThisWeek && isCurrent) || p.needs_amount_count ? "due" : "faint"} style={{ marginTop: 9, letterSpacing: 1 }}>
+                {p.needs_amount_count
+                  ? `${p.needs_amount_count} TO FILL`
+                  : p.settled_count === p.total_count
+                    ? "ALL SETTLED"
+                    : dueThisWeek && isCurrent
+                      ? `${dueThisWeek} DUE THIS WEEK`
+                      : `${p.settled_count} OF ${p.total_count} DONE`}
               </Txt>
             </BezelDial>
           </Rise>
 
           {usesSalary ? (
-            <Rise delay={200} style={{ marginHorizontal: GUTTER, marginTop: 18 }}>
-              <PressableScale onPress={salary > 0 ? undefined : () => open({ kind: "income" })} haptic={salary > 0 ? "none" : "selection"} scaleTo={salary > 0 ? 1 : 0.985}>
+            <Rise delay={160} style={{ marginHorizontal: GUTTER, marginTop: 18 }}>
+              <PressableScale onPress={() => setSalaryOpen(true)} scaleTo={0.985}>
                 <EdgeCard radius={16} padding={0} innerStyle={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 14 }}>
                   <IconCircle name="salary" size={32} />
                   <View style={{ flex: 1 }}>
                     <Txt variant="bodyMedium" size={14}>
-                      {salary > 0 ? "Salary this month" : "Add this month's salary"}
+                      {salary > 0 ? `Based on salary` : `Add salary for ${name}`}
                     </Txt>
                     <Txt variant="tag" style={{ marginTop: 3 }}>
-                      {salary > 0 ? "BASE FOR 10% AND 5% ITEMS" : "THEN 10% AND 5% ARE WORKED OUT"}
+                      {p.salary.override
+                        ? "SET BY YOU"
+                        : p.salary.entries.length
+                          ? `RECEIVED ${dayHeader(parseDay(p.salary.entries[0].date)).toUpperCase()}`
+                          : "THEN THE % ITEMS ARE WORKED OUT"}
                     </Txt>
                   </View>
                   {salary > 0 ? <Money value={salary} /> : <Icon name="plus" size={18} color={palette.text} />}
@@ -147,34 +215,72 @@ export function PlanScreen() {
             </Rise>
           ) : null}
 
-          {groups.due.length ? (
-            <Rise delay={280} style={{ marginTop: 24 }}>
-              <SectionLabel label="DUE" right={String(groups.due.length)} />
-              <View style={{ paddingHorizontal: GUTTER, marginTop: 2 }}>{groups.due.map(dueRow)}</View>
+          {groups.toFill.length ? (
+            <Rise delay={220} style={{ marginTop: 24 }}>
+              <SectionLabel label="TO FILL" right={String(groups.toFill.length)} />
+              <View style={{ paddingHorizontal: GUTTER, marginTop: 2 }}>
+                {groups.toFill.map((s) => (
+                  <ListRow
+                    key={s.id}
+                    icon={categoryIcon(categoryMap, s.category_slug)}
+                    title={s.name}
+                    subtitle={
+                      <Txt variant="caption" tone="due" numberOfLines={1}>
+                        {s.last_month_amount ? `Last month ${formatINR(s.last_month_amount)}` : "Amount changes every month"}
+                      </Txt>
+                    }
+                    onPress={() => setTapped(s)}
+                    right={<Pill variant="outline" label="Enter amount" />}
+                  />
+                ))}
+              </View>
             </Rise>
           ) : null}
 
-          {groups.partial.length ? (
-            <Rise delay={340} style={{ marginTop: 18 }}>
-              <SectionLabel label="IN PROGRESS" right={String(groups.partial.length)} />
+          {groups.open.length ? (
+            <Rise delay={260} style={{ marginTop: 22 }}>
+              <SectionLabel label="BILLS" right={String(groups.open.length)} />
+              <View style={{ paddingHorizontal: GUTTER, marginTop: 2 }}>{groups.open.map(billRow)}</View>
+            </Rise>
+          ) : null}
+
+          {groups.allowances.length ? (
+            <Rise delay={300} style={{ marginTop: 22 }}>
+              <SectionLabel label="ALLOWANCES" right={String(groups.allowances.length)} />
               <View style={{ paddingHorizontal: GUTTER }}>
-                {groups.partial.map((s) => {
+                {groups.allowances.map((s) => {
                   const due = toNumber(s.due_amount);
-                  const done = toNumber(s.paid_amount);
+                  const spent = toNumber(s.spent_amount);
+                  const left = toNumber(s.left_amount);
+                  const needsMove = Boolean(s.dest_account_id) && !s.closed && (s.status === "due" || s.status === "partial");
                   return (
-                    <PressableScale key={s.item.id} onPress={() => setPaying(s)} scaleTo={0.985}>
+                    <PressableScale key={s.id} onPress={() => setTapped(s)} scaleTo={0.985}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 13, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: palette.hairline }}>
-                        <IconCircle name={categoryIcon(categoryMap, s.item.category_slug)} />
-                        <View style={{ flex: 1, gap: 8 }}>
-                          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <Txt variant="bodyMedium">{s.item.name}</Txt>
-                            <Txt variant="label" tabular>
-                              {formatINR(s.remaining)} left
+                        <IconCircle name={categoryIcon(categoryMap, s.category_slug)} />
+                        <View style={{ flex: 1, gap: 7 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <Txt variant="bodyMedium" numberOfLines={1} style={{ flex: 1 }}>
+                              {s.name}
                             </Txt>
+                            {needsMove ? (
+                              <Pill label={`Move ${formatINR(s.remaining ?? s.due_amount)}`} />
+                            ) : s.status === "awaiting_income" ? (
+                              <Txt variant="caption">Waiting for salary</Txt>
+                            ) : (
+                              <Txt variant="label" tone={left < 0 ? "negative" : "text"} tabular>
+                                {left < 0 ? `${formatINR(-left)} over` : `${formatINR(left)} left`}
+                              </Txt>
+                            )}
                           </View>
-                          <GrowBar fraction={due ? done / due : 0} color={palette.text} height={2} delay={600} />
-                          <Txt variant="caption" tabular>
-                            {subtitleFor(s)} · {formatINR(done)} of {formatINR(due)} given
+                          <GrowBar fraction={due ? Math.min(1, spent / due) : 0} color={left < 0 ? palette.negative : palette.text} height={2} delay={500} />
+                          <Txt variant="caption" tabular numberOfLines={1}>
+                            {[
+                              `${formatINR(spent)} of ${amountText(s)}`,
+                              s.covers_rest ? "everything else" : null,
+                              s.dest_account_id ? `${toNumber(s.paid_amount) >= due && due > 0 ? "in" : "→"} ${accountName(s.dest_account_id)}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </Txt>
                         </View>
                       </View>
@@ -185,19 +291,52 @@ export function PlanScreen() {
             </Rise>
           ) : null}
 
+          {p.buckets.length ? (
+            <Rise delay={340} style={{ marginTop: 22 }}>
+              <SectionLabel label="BUCKETS" right={shortBuckets.length ? `${shortBuckets.length} SHORT` : "OK"} />
+              <View style={{ paddingHorizontal: GUTTER }}>
+                {p.buckets.map((b) => {
+                  const short = toNumber(b.short);
+                  return (
+                    <View key={b.account_id} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 60, borderBottomWidth: 1, borderBottomColor: palette.hairline }}>
+                      <IconCircle name="bank" size={34} />
+                      <View style={{ flex: 1 }}>
+                        <Txt variant="bodyMedium" numberOfLines={1}>
+                          {accountName(b.account_id)}
+                        </Txt>
+                        <Txt variant="caption" tone={short > 0 ? "negative" : "muted"} tabular numberOfLines={1}>
+                          {short > 0
+                            ? `${formatINR(b.balance)} in account · ${formatINR(b.reserved)} set aside · ${formatINR(short)} short`
+                            : `${formatINR(b.reserved)} set aside · covered`}
+                        </Txt>
+                      </View>
+                      {short > 0 ? (
+                        <PressableScale onPress={() => open({ kind: "transfer", prefill: { amount: short, destId: b.account_id, note: "Top up bucket" } })} accessibilityLabel="Top up">
+                          <Pill label="Top up" />
+                        </PressableScale>
+                      ) : (
+                        <Icon name="check" size={15} color={palette.textMuted} strokeWidth={2.2} />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </Rise>
+          ) : null}
+
           {groups.settled.length ? (
-            <Rise delay={400} style={{ marginTop: 18 }}>
+            <Rise delay={380} style={{ marginTop: 22 }}>
               <SectionLabel label="SETTLED" right={String(groups.settled.length)} />
               <View style={{ paddingHorizontal: GUTTER }}>
                 {showSettled ? (
                   groups.settled.map((s) => (
                     <ListRow
-                      key={s.item.id}
+                      key={s.id}
                       dim
-                      icon={categoryIcon(categoryMap, s.item.category_slug)}
-                      title={s.item.name}
-                      subtitle={s.payments.length ? `Paid ${monoDay(new Date(s.payments[s.payments.length - 1].occurred_at)).replace(/^0/, "")}` : "Paid"}
-                      onPress={() => setPaying(s)}
+                      icon={categoryIcon(categoryMap, s.category_slug)}
+                      title={s.name}
+                      subtitle={s.closed ? "Marked done" : s.payments.length ? `Paid ${monoDay(new Date(s.payments[s.payments.length - 1].occurred_at)).replace(/^0/, "")}` : "Paid"}
+                      onPress={() => setTapped(s)}
                       right={
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                           <Icon name="check" size={14} color={palette.textMuted} strokeWidth={2.2} />
@@ -211,13 +350,13 @@ export function PlanScreen() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 13, minHeight: 58 }}>
                       <View style={{ flexDirection: "row" }}>
                         {groups.settled.slice(0, 3).map((s, i) => (
-                          <View key={s.item.id} style={{ marginLeft: i ? -8 : 0 }}>
-                            <IconCircle name={categoryIcon(categoryMap, s.item.category_slug)} size={28} dim />
+                          <View key={s.id} style={{ marginLeft: i ? -8 : 0 }}>
+                            <IconCircle name={categoryIcon(categoryMap, s.category_slug)} size={28} dim />
                           </View>
                         ))}
                       </View>
                       <Txt variant="body" tone="muted" style={{ flex: 1 }} numberOfLines={1}>
-                        {groups.settled.map((s) => s.item.name).join(", ")}
+                        {groups.settled.map((s) => s.name).join(", ")}
                       </Txt>
                       <Icon name="check" size={15} color={palette.textMuted} strokeWidth={2.2} />
                       <Money value={groups.settled.reduce((sum, s) => sum + toNumber(s.paid_amount), 0)} tone="muted" />
@@ -228,16 +367,54 @@ export function PlanScreen() {
             </Rise>
           ) : null}
 
-          <Rise delay={460} style={{ paddingHorizontal: GUTTER, marginTop: 24 }}>
-            <Button variant="outline" label="Manage plan items" icon="edit" onPress={() => nav.navigate("PlanItems")} />
+          <Rise delay={420} style={{ paddingHorizontal: GUTTER, marginTop: 24 }}>
+            {canPlan ? (
+              <Button variant="outline" label={`Add to ${name}`} icon="plus" onPress={() => setEditing({ draft: { name: "", category_slug: "other", kind: "bill", amount_type: "fixed", repeat: true } })} />
+            ) : null}
             <Txt variant="caption" tone="faint" style={{ textAlign: "center", marginTop: 10 }}>
-              {monthName(month)} · amounts follow the salary recorded that month
+              Tap an item to pay it, change it, or change it from now on
             </Txt>
           </Rise>
+          {canPlan ? <Suggestions existing={p.items} onPick={(d) => setEditing({ draft: d })} /> : null}
         </>
       )}
 
-      <PaySheet status={paying} month={month} onClose={() => setPaying(null)} />
+      <LineSheet
+        line={tapped}
+        plan={p}
+        ym={month}
+        onClose={() => setTapped(null)}
+        onEdit={(line) => {
+          setTapped(null);
+          setEditing({ line });
+        }}
+      />
+      <LineEditor target={editing} ym={month} onClose={() => setEditing(null)} />
+      <SalarySheet visible={salaryOpen} plan={p} ym={month} onClose={() => setSalaryOpen(false)} />
     </Screen>
   );
 }
+
+/** The usual notebook items not in the plan yet, one tap to start adding. */
+function Suggestions({ existing = [], onPick }: { existing?: PlanLine[]; onPick: (d: (typeof SUGGESTIONS)[number]) => void }) {
+  const categoryMap = useCategoryMap();
+  const taken = new Set(existing.map((i) => i.name.toLowerCase()));
+  const left = SUGGESTIONS.filter((s) => !taken.has(s.name.toLowerCase()) && !existing.some((e) => e.category_slug === s.category_slug));
+  if (!left.length) return null;
+  return (
+    <View style={{ marginTop: 22 }}>
+      <SectionLabel label="SUGGESTED" />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: GUTTER, marginTop: 12 }}>
+        {left.map((s) => (
+          <Chip
+            key={s.name}
+            icon={categoryIcon(categoryMap, s.category_slug)}
+            label={s.amount_type === "percent" ? `${s.name} · ${s.percent}%` : s.name}
+            onPress={() => onPick(s)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+

@@ -13,12 +13,12 @@ import {
   useAccounts,
   useCategories,
   useCategoryMap,
-  useCreateTransaction,
   useCreateTransfer,
   useDeleteTransaction,
   useMonthTransactions,
   useUpdateTransaction,
 } from "../../api/hooks";
+import { enqueue } from "../../api/outbox";
 import type { Transaction } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
 import { ApiError } from "../../core/api/ApiError";
@@ -86,7 +86,11 @@ function KeypadKey({ k, onPress, onLongPress }: { k: (typeof KEYS)[number]; onPr
   );
 }
 
-type Props = { visible: boolean; onClose: () => void; options: { kind?: EntryKind; edit?: Transaction } };
+type Props = {
+  visible: boolean;
+  onClose: () => void;
+  options: { kind?: EntryKind; edit?: Transaction; prefill?: { amount?: number; accountId?: string; destId?: string; note?: string } };
+};
 
 export function QuickAddSheet({ visible, onClose, options }: Props) {
   const palette = usePalette();
@@ -97,7 +101,6 @@ export function QuickAddSheet({ visible, onClose, options }: Props) {
   const { data: categories = [] } = useCategories();
   const categoryMap = useCategoryMap();
   const { data: monthTx = [] } = useMonthTransactions(currentMonth());
-  const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
   const deleteTx = useDeleteTransaction();
   const createTransfer = useCreateTransfer();
@@ -105,13 +108,18 @@ export function QuickAddSheet({ visible, onClose, options }: Props) {
   const [kind, setKind] = useState<EntryKind>(
     editing ? (isTransferLeg ? "transfer" : toNumber(editing.amount) < 0 ? "expense" : "income") : options.kind ?? "expense"
   );
+  const prefill = options.prefill;
   const [amount, setAmount] = useState(() =>
-    editing ? String(Math.abs(toNumber(editing.amount))).replace(/\.0+$/, "") : ""
+    editing
+      ? String(Math.abs(toNumber(editing.amount))).replace(/\.0+$/, "")
+      : prefill?.amount
+        ? String(Math.round(prefill.amount * 100) / 100)
+        : ""
   );
-  const [note, setNote] = useState(editing?.description ?? "");
+  const [note, setNote] = useState(editing?.description ?? prefill?.note ?? "");
   const [slug, setSlug] = useState<string | null>(editing?.category_slug ?? null);
-  const [accountId, setAccountId] = useState<string | null>(editing?.account_id ?? null);
-  const [destId, setDestId] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(editing?.account_id ?? prefill?.accountId ?? null);
+  const [destId, setDestId] = useState<string | null>(prefill?.destId ?? null);
   const [when, setWhen] = useState<Date>(() => (editing ? new Date(editing.occurred_at) : new Date()));
   const [picker, setPicker] = useState<Picker>(null);
   const [error, setError] = useState<string | null>(null);
@@ -231,12 +239,9 @@ export function QuickAddSheet({ visible, onClose, options }: Props) {
 
     if (!slug) return setError("Pick a category");
     AsyncStorage.setItem(LAST_ACCOUNT_KEY, accountId).catch(() => {});
+    // Saved on the phone first: it shows at once and reaches the server when it can.
+    enqueue({ kind: "tx", body: { account_id: accountId, amount: signed, category_slug: slug, description, occurred_at } });
     tapHaptic("success");
-    // Optimistic: the entry appears instantly; the sheet closes right away.
-    createTx.mutate(
-      { account_id: accountId, amount: signed, category_slug: slug, description, occurred_at },
-      { onError: (e) => Alert.alert("Couldn't save that entry", errorMessage(e)) }
-    );
     onClose();
   }
 

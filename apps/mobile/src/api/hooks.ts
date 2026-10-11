@@ -4,6 +4,7 @@
  * refetch balances, summaries and the monthly plan from the server.
  */
 import { useMemo } from "react";
+import { Alert } from "react-native";
 import {
   QueryClient,
   useMutation,
@@ -12,15 +13,16 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 import { api } from "./client";
+import { setOutboxHandlers, useOutbox, type OutboxItem } from "./outbox";
+import { showToast } from "../ui/Toast";
 import type {
   Account,
   AccountInput,
   Category,
   CategoryKind,
-  PayInput,
-  PlanItemInput,
+  MonthPlan,
+  ReconcileInput,
   Transaction,
-  TransactionInput,
   TransactionPatch,
   TransferInput,
 } from "./types";
@@ -39,20 +41,121 @@ export const qk = {
   household: ["household"] as const,
   accounts: ["accounts"] as const,
   categories: (all: boolean) => ["categories", all] as const,
-  planItems: (all: boolean) => ["plan-items", all] as const,
-  plan: (ym: YearMonth) => ["plan", ym.year, ym.month] as const,
   summary: (ym: YearMonth) => ["summary", ym.year, ym.month] as const,
   monthTx: (ym: YearMonth) => ["transactions", "month", ym.year, ym.month] as const,
   recentTx: ["transactions", "recent"] as const,
+  monthPlan: (ym: YearMonth) => ["month-plan", ym.year, ym.month] as const,
 };
 
 /** Everything a new/edited/deleted entry can change. */
 function invalidateLedger(qc: QueryClient) {
   return Promise.all(
-    [["accounts"], ["transactions"], ["summary"], ["plan"]].map((queryKey) =>
+    [["accounts"], ["transactions"], ["summary"], ["plan"], ["month-plan"], ["sms-drafts"]].map((queryKey) =>
       qc.invalidateQueries({ queryKey })
     )
   );
+}
+
+/** "Counted as October Rent ✓" with Undo, after the server links an entry to the plan. */
+function announceLink(tx: Transaction) {
+  let line: string | null = null;
+  let monthLabel = "this month's plan";
+  for (const [, plan] of queryClient.getQueriesData<MonthPlan>({ queryKey: ["month-plan"] })) {
+    const hit = plan?.items.find((i) => i.id === tx.plan_item_id);
+    if (hit && plan) {
+      line = hit.name;
+      monthLabel = new Date(plan.year, plan.month - 1, 1).toLocaleString("en-IN", { month: "long" });
+    }
+  }
+  showToast({
+    message: line ? `Counted as ${monthLabel} ${line}` : `Counted in ${monthLabel}`,
+    action: {
+      label: "Undo",
+      onPress: () =>
+        void api.transactions
+          .update(tx.id, { plan_item_id: null })
+          .catch(() => Alert.alert("Couldn't undo that", "Open the plan item to unlink it."))
+          .finally(() => invalidateLedger(queryClient)),
+    },
+  });
+}
+
+setOutboxHandlers({
+  onSynced: () => void invalidateLedger(queryClient),
+  onRejected: (message) => Alert.alert("Couldn't save an entry", message),
+  onLinked: announceLink,
+});
+
+/** Outbox entries shaped like server rows (a transfer becomes its two legs). */
+function pendingRows(items: OutboxItem[]): Transaction[] {
+  const base = {
+    user_id: "",
+    household_id: "",
+    notes: null,
+    monthly_payment_id: null,
+    period_month: null,
+    source_ref: null,
+  };
+  return items.flatMap((i): Transaction[] => {
+    const created_at = new Date(i.createdAt).toISOString();
+    if (i.kind === "tx") {
+      return [
+        {
+          ...base,
+          id: `pending-${i.id}`,
+          account_id: i.body.account_id,
+          amount: i.body.amount,
+          description: i.body.description ?? "",
+          category_slug: i.body.category_slug ?? "uncategorized",
+          occurred_at: i.body.occurred_at,
+          created_at,
+          transfer_id: null,
+          source: i.body.source ?? "manual",
+        },
+      ];
+    }
+    const occurred_at = i.body.occurred_at ?? created_at;
+    const leg = { ...base, category_slug: "transfer", occurred_at, created_at, transfer_id: `pending-${i.id}`, source: i.body.source ?? "manual" };
+    return [
+      { ...leg, id: `pending-${i.id}-out`, account_id: i.body.source_account_id, amount: `-${i.body.amount}`, description: i.body.description ?? "" },
+      { ...leg, id: `pending-${i.id}-in`, account_id: i.body.dest_account_id, amount: i.body.amount, description: i.body.description ?? "" },
+    ];
+  });
+}
+
+/** Entries saved on the phone that haven't reached the server yet, newest first. */
+export function usePendingTransactions(): Transaction[] {
+  const items = useOutbox();
+  return useMemo(
+    () => pendingRows(items).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)),
+    [items]
+  );
+}
+
+/** Server rows plus waiting ones, so a new entry shows (and counts) right away. */
+export function withPending(rows: Transaction[] | undefined, pending: Transaction[], ym?: YearMonth): Transaction[] {
+  const inMonth = ym
+    ? pending.filter((t) => {
+        const d = new Date(t.occurred_at);
+        return d.getFullYear() === ym.year && d.getMonth() + 1 === ym.month;
+      })
+    : pending;
+  return [...inMonth, ...(rows ?? [])].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+}
+
+/** Account balances including entries still waiting to sync. */
+export function useAccountsWithPending() {
+  const accounts = useAccounts();
+  const pending = usePendingTransactions();
+  const data = useMemo(() => {
+    if (!accounts.data || pending.length === 0) return accounts.data;
+    const delta = new Map<string, number>();
+    for (const t of pending) delta.set(t.account_id, (delta.get(t.account_id) ?? 0) + toNumber(t.amount));
+    return accounts.data.map((a) =>
+      delta.has(a.id) ? { ...a, balance: String(toNumber(a.balance) + (delta.get(a.id) ?? 0)) } : a
+    );
+  }, [accounts.data, pending]);
+  return { ...accounts, data };
 }
 
 // --- reads ---------------------------------------------------------------------------
@@ -78,14 +181,20 @@ export function useCategoryMap(): Map<string, Category> {
   return useMemo(() => new Map((data ?? []).map((c) => [c.slug, c])), [data]);
 }
 
-export const usePlanItems = (includeInactive = false) =>
-  useQuery({
-    queryKey: qk.planItems(includeInactive),
-    queryFn: () => api.plan.items(includeInactive),
-  });
+/** A month's own plan (created on the server the first time it's opened). */
+export const useMonthPlan = (ym: YearMonth, enabled = true) =>
+  useQuery({ queryKey: qk.monthPlan(ym), queryFn: () => api.monthPlan.get(ym.year, ym.month), enabled });
 
-export const usePlanStatus = (ym: YearMonth) =>
-  useQuery({ queryKey: qk.plan(ym), queryFn: () => api.plan.status(ym.year, ym.month) });
+/** Any change to a month's plan: the server answers with the whole updated plan. */
+export function usePlanAction(ym: YearMonth) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (run: () => Promise<MonthPlan>) => run(),
+    onSuccess: (plan) => qc.setQueryData(qk.monthPlan(ym), plan),
+    // Payments move balances; edits "from now on" change later months too.
+    onSettled: () => invalidateLedger(qc),
+  });
+}
 
 export const useMonthSummary = (ym: YearMonth) =>
   useQuery({ queryKey: qk.summary(ym), queryFn: () => api.summary.month(ym.year, ym.month) });
@@ -127,43 +236,6 @@ function adjustBalance(qc: QueryClient, accountId: string, delta: number) {
   );
 }
 
-export function useCreateTransaction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: TransactionInput) => api.transactions.create(body),
-    onMutate: async (body) => {
-      await qc.cancelQueries({ queryKey: ["transactions"] });
-      const snap = snapshot(qc);
-      const optimistic: Transaction = {
-        id: `optimistic-${Date.now()}`,
-        user_id: "",
-        household_id: "",
-        account_id: body.account_id,
-        amount: body.amount,
-        description: body.description ?? "",
-        category_slug: body.category_slug ?? "uncategorized",
-        occurred_at: body.occurred_at,
-        notes: body.notes ?? null,
-        created_at: new Date().toISOString(),
-        transfer_id: null,
-        source: "manual",
-        source_ref: null,
-        monthly_payment_id: body.monthly_payment_id ?? null,
-        period_month: body.period_month ?? null,
-      };
-      const d = new Date(body.occurred_at);
-      const ym = { year: d.getFullYear(), month: d.getMonth() + 1 };
-      const prepend = (rows?: Transaction[]) => (rows ? [optimistic, ...rows] : rows);
-      qc.setQueryData<Transaction[]>(qk.monthTx(ym), prepend);
-      qc.setQueryData<Transaction[]>(qk.recentTx, prepend);
-      adjustBalance(qc, body.account_id, toNumber(body.amount));
-      return { snap };
-    },
-    onError: (_e, _body, ctx) => restore(qc, ctx?.snap),
-    onSettled: () => invalidateLedger(qc),
-  });
-}
-
 export function useUpdateTransaction() {
   const qc = useQueryClient();
   return useMutation({
@@ -203,10 +275,10 @@ export function useCreateTransfer() {
   });
 }
 
-export function usePayPlanItem() {
+export function useReconcileAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, body }: { itemId: string; body: PayInput }) => api.plan.pay(itemId, body),
+    mutationFn: ({ id, body }: { id: string; body: ReconcileInput }) => api.accounts.reconcile(id, body),
     onSettled: () => invalidateLedger(qc),
   });
 }
@@ -244,31 +316,6 @@ export function useArchiveCategory() {
   return useMutation({
     mutationFn: (id: string) => api.categories.archive(id),
     onSettled: () => qc.invalidateQueries({ queryKey: ["categories"] }),
-  });
-}
-
-export function useSavePlanItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body }: { id?: string; body: PlanItemInput }) =>
-      id ? api.plan.update(id, body) : api.plan.create(body),
-    onSettled: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: ["plan-items"] }),
-        qc.invalidateQueries({ queryKey: ["plan"] }),
-      ]),
-  });
-}
-
-export function useArchivePlanItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => api.plan.archive(id),
-    onSettled: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: ["plan-items"] }),
-        qc.invalidateQueries({ queryKey: ["plan"] }),
-      ]),
   });
 }
 

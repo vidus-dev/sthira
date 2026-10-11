@@ -86,6 +86,9 @@ export function SignInScreen() {
       <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
       <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" textContentType="password" onSubmitEditing={submit} returnKeyType="go" error={error} />
       <Button size="lg" label="Sign in" loading={busy} onPress={submit} style={{ marginTop: 6 }} />
+      <PressableScale onPress={() => nav.navigate("ForgotPassword")} hitSlop={10} style={{ alignSelf: "center", marginTop: 4 }}>
+        <Txt variant="label">Forgot password?</Txt>
+      </PressableScale>
     </AuthLayout>
   );
 }
@@ -129,6 +132,53 @@ export function SignUpScreen() {
       <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
       <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" hint="At least 8 characters" onSubmitEditing={submit} error={error} />
       <Button size="lg" label="Create account" loading={busy} onPress={submit} style={{ marginTop: 6 }} />
+    </AuthLayout>
+  );
+}
+
+/** Reset a forgotten password with the recovery key saved from Settings. */
+export function ForgotPasswordScreen() {
+  const nav = useNavigation();
+  const { resetPassword } = useAuth();
+  const [email, setEmail] = useState("");
+  const [key, setKey] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!email.trim()) return setError("Enter your email");
+    if (key.replace(/[^a-z0-9]/gi, "").length < 16) return setError("The recovery key has 16 letters and numbers");
+    if (password.length < 8) return setError("Use at least 8 characters for the new password");
+    setBusy(true);
+    setError(null);
+    try {
+      await resetPassword(email, key, password);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthLayout
+      title="Reset your password"
+      footer={
+        <PressableScale onPress={() => nav.goBack()} hitSlop={10}>
+          <Txt variant="label">
+            Remembered it? <Txt variant="label" tone="text">Sign in</Txt>
+          </Txt>
+        </PressableScale>
+      }
+    >
+      <Txt variant="label" style={{ lineHeight: 20 }}>
+        Use the recovery key you saved from Settings → Recovery key. It works once; make a new one after.
+      </Txt>
+      <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
+      <TextField label="Recovery key" value={key} onChangeText={setKey} autoCapitalize="characters" autoCorrect={false} placeholder="XXXX-XXXX-XXXX-XXXX" />
+      <TextField label="New password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" hint="At least 8 characters" onSubmitEditing={submit} error={error} />
+      <Button size="lg" label="Reset and sign in" loading={busy} onPress={submit} style={{ marginTop: 6 }} />
     </AuthLayout>
   );
 }

@@ -16,7 +16,10 @@ import { StackHeader } from "../../ui/StackHeader";
 import { Txt } from "../../ui/Txt";
 import { useAppLock } from "../lock/AppLock";
 import { firstName } from "../shared";
+import { eveningHourPref, eveningNudgePref, planRemindersPref, privacyScreenPref } from "../../core/prefs";
+import { ensureNotificationPermission } from "../reminders/Reminders";
 import { exportEntries } from "./exportEntries";
+import { ChangePasswordSheet, RecoveryKeySheet } from "./SecuritySheets";
 import { SharingSheet } from "./SharingSheet";
 
 export function SettingsScreen() {
@@ -28,6 +31,20 @@ export function SettingsScreen() {
   const [name, setName] = useState(user?.display_name ?? "");
   const [sharing, setSharing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const privacy = privacyScreenPref.use();
+  const planReminders = planRemindersPref.use();
+  const evening = eveningNudgePref.use();
+  const eveningHour = eveningHourPref.use();
+
+  async function toggleReminder(set: (v: boolean) => void, v: boolean) {
+    if (v && !(await ensureNotificationPermission())) {
+      Alert.alert("Notifications are off for Sthira", "Turn them on in the phone's Settings → Apps → Sthira → Notifications.");
+      return;
+    }
+    set(v);
+  }
 
   const others = (household?.members ?? []).filter((m) => m.id !== user?.id);
   const chevron = <Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />;
@@ -78,12 +95,19 @@ export function SettingsScreen() {
         <SectionLabel label="MANAGE" />
         <View style={{ paddingHorizontal: GUTTER }}>
           {[
+            { icon: "inbox", title: "Catch up", sub: "Bank SMS, balance check, type several", to: "CatchUp" as const },
             { icon: "bank", title: "Accounts", sub: "Banks, cards, cash, wallets", to: "Accounts" as const },
             { icon: "dots", title: "Categories", sub: "Your own spending & income types", to: "Categories" as const },
-            { icon: "plan", title: "Monthly plan items", sub: "Rent, EMI, 10% and 5% of salary…", to: "PlanItems" as const },
           ].map((r) => (
             <ListRow key={r.to} icon={r.icon} title={r.title} subtitle={r.sub} onPress={() => nav.navigate(r.to)} right={chevron} />
           ))}
+          <ListRow
+            icon="plan"
+            title="Monthly plan"
+            subtitle="Each month's bills, allowances and buckets"
+            onPress={() => nav.navigate("Main", { screen: "Plan" })}
+            right={chevron}
+          />
           <ListRow
             icon="users"
             title="Share with family"
@@ -118,6 +142,13 @@ export function SettingsScreen() {
             { value: "light", label: "Light" },
           ]}
         />
+        <SettingToggle
+          icon="eyeOff"
+          title="Privacy screen"
+          sub="Hide Sthira in Recent apps and block screenshots"
+          value={privacy}
+          onChange={privacyScreenPref.set}
+        />
         {lock.available ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 13, paddingVertical: 8 }}>
             <Icon name="fingerprint" size={20} color={palette.text} />
@@ -128,6 +159,52 @@ export function SettingsScreen() {
             <Toggle value={lock.enabled} onChange={(v) => void lock.setEnabled(v)} />
           </View>
         ) : null}
+      </Rise>
+
+      <Rise delay={210} style={{ marginTop: 26, paddingHorizontal: GUTTER, gap: 6 }}>
+        <Txt variant="tag" style={{ letterSpacing: 1.2, marginBottom: 6 }}>
+          REMINDERS
+        </Txt>
+        <SettingToggle
+          icon="plan"
+          title="Monthly plan"
+          sub="2 days before and on the due day, 9 AM"
+          value={planReminders}
+          onChange={(v) => void toggleReminder(planRemindersPref.set, v)}
+        />
+        <SettingToggle
+          icon="bell"
+          title="Evening nudge"
+          sub="Only on days with nothing added"
+          value={evening}
+          onChange={(v) => void toggleReminder(eveningNudgePref.set, v)}
+        />
+        {evening ? (
+          <Segmented<string>
+            style={{ marginTop: 4 }}
+            value={String(eveningHour)}
+            onChange={(v) => eveningHourPref.set(Number(v))}
+            options={[
+              { value: "20", label: "8 PM" },
+              { value: "21", label: "9 PM" },
+              { value: "22", label: "10 PM" },
+            ]}
+          />
+        ) : null}
+      </Rise>
+
+      <Rise delay={225} style={{ marginTop: 26 }}>
+        <SectionLabel label="SIGN-IN" />
+        <View style={{ paddingHorizontal: GUTTER }}>
+          <ListRow
+            icon="key"
+            title="Recovery key"
+            subtitle={user?.has_recovery_key ? "Set · resets a forgotten password" : "Not set · create one in case you forget your password"}
+            onPress={() => setRecovery(true)}
+            right={chevron}
+          />
+          <ListRow icon="lock" title="Change password" onPress={() => setChangingPassword(true)} right={chevron} />
+        </View>
       </Rise>
 
       <Rise delay={240} style={{ paddingHorizontal: GUTTER, marginTop: 28, gap: 14 }}>
@@ -148,6 +225,22 @@ export function SettingsScreen() {
       </Rise>
 
       <SharingSheet visible={sharing} onClose={() => setSharing(false)} />
+      <RecoveryKeySheet visible={recovery} onClose={() => setRecovery(false)} />
+      <ChangePasswordSheet visible={changingPassword} onClose={() => setChangingPassword(false)} />
     </Screen>
+  );
+}
+
+function SettingToggle({ icon, title, sub, value, onChange }: { icon: string; title: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
+  const palette = useTheme().palette;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 13, paddingVertical: 8 }}>
+      <Icon name={icon} size={20} color={palette.text} />
+      <View style={{ flex: 1 }}>
+        <Txt variant="bodyMedium">{title}</Txt>
+        <Txt variant="caption">{sub}</Txt>
+      </View>
+      <Toggle value={value} onChange={onChange} />
+    </View>
   );
 }

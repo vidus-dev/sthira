@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { useAccounts, useJoinHousehold, usePlanItems } from "../../api/hooks";
+import { useAccounts, useJoinHousehold, useMonthPlan } from "../../api/hooks";
+import { currentMonth } from "../../core/format/dates";
 import { useAuth } from "../../auth/AuthContext";
 import { ApiError } from "../../core/api/ApiError";
 import { usePalette } from "../../theme/ThemeProvider";
@@ -23,7 +24,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const nav = useNavigation();
   const { user } = useAuth();
   const { data: accounts = [] } = useAccounts();
-  const { data: planItems = [] } = usePlanItems();
+  const planItems = useMonthPlan(currentMonth()).data?.items ?? [];
   const join = useJoinHousehold();
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState("");
@@ -42,8 +43,8 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   }
 
   const steps = [
-    { done: accounts.length > 0, icon: "bank", title: "Add your accounts", body: "Each bank, credit card, cash and wallet with today's balance.", to: "Accounts" as const },
-    { done: planItems.length > 0, icon: "plan", title: "Set up your monthly plan", body: "Rent, EMI, internet, 10% to guru and 5% donations.", to: "PlanItems" as const },
+    { done: accounts.length > 0, icon: "bank", title: "Add your accounts", body: "Each bank, credit card, cash and wallet with today's balance.", to: "Accounts", go: () => nav.navigate("Accounts") },
+    { done: planItems.length > 0, icon: "plan", title: "Set up your monthly plan", body: "Rent, EMI, internet, 10% to guru and 5% donations.", to: "Plan", go: () => nav.navigate("Main", { screen: "Plan" }) },
   ];
 
   return (
@@ -59,7 +60,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
       <Rise delay={120} style={{ paddingHorizontal: GUTTER, marginTop: 26, gap: 12 }}>
         {steps.map((s, i) => (
-          <PressableScale key={s.to} onPress={() => nav.navigate(s.to)} scaleTo={0.985}>
+          <PressableScale key={s.to} onPress={s.go} scaleTo={0.985}>
             <EdgeCard radius={18} padding={16}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
                 <View
