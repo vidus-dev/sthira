@@ -26,6 +26,12 @@ class User(Base):
         index=True,
     )
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # bcrypt hash of a one-time recovery key; lets the owner reset a forgotten password
+    # without an email service. Cleared once used.
+    recovery_key_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    recovery_key_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

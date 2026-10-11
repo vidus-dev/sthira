@@ -72,6 +72,13 @@ class LedgerTransaction(Base):
         index=True,
     )
     period_month: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # The month's plan line this pays (or funds, for a transfer's outgoing leg).
+    plan_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("month_plan_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     user = relationship("User", back_populates="ledger_transactions")
     account = relationship("FinancialAccount", back_populates="transactions")

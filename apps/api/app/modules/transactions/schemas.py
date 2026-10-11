@@ -21,6 +21,8 @@ class TransactionCreate(BaseModel):
     # Pays a monthly plan item; ``period_month`` defaults to the month of ``occurred_at``.
     monthly_payment_id: UUID | None = None
     period_month: date | None = None
+    # A line in a month's plan this pays; its month and repeating item are filled in.
+    plan_item_id: UUID | None = None
 
 
 class TransactionUpdate(BaseModel):
@@ -32,6 +34,8 @@ class TransactionUpdate(BaseModel):
     # Send ``monthly_payment_id: null`` to unlink from the plan.
     monthly_payment_id: UUID | None = None
     period_month: date | None = None
+    # Link to / unlink from (null) a line in a month's plan.
+    plan_item_id: UUID | None = None
 
 
 class TransactionRead(BaseModel):
@@ -50,5 +54,6 @@ class TransactionRead(BaseModel):
     source_ref: str | None = None
     monthly_payment_id: UUID | None = None
     period_month: date | None = None
+    plan_item_id: UUID | None = None
 
     model_config = {"from_attributes": True}

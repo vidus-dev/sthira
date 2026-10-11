@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.modules.transactions.schemas import TxSource
+
 
 class TransferCreate(BaseModel):
     source_account_id: UUID
@@ -15,6 +17,12 @@ class TransferCreate(BaseModel):
     # aside the 10%); the outgoing leg is linked to it.
     monthly_payment_id: UUID | None = None
     period_month: date | None = None
+    # A month's plan line this funds (the outgoing leg is linked).
+    plan_item_id: UUID | None = None
+    # Imports (e.g. a debit SMS and the matching credit SMS) dedupe each leg separately.
+    source: TxSource = "manual"
+    source_ref: str | None = Field(default=None, min_length=1, max_length=128)
+    dest_source_ref: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class TransferRead(BaseModel):

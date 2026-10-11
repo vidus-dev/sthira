@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.actor import Actor
 from app.models.transaction import LedgerTransaction
 from app.modules.accounts.repository import AccountRepository
+from app.modules.errors import ConflictError
+from app.modules.month_plans import linking
 from app.modules.periods import household_timezone, month_start, period_for
 from app.modules.transactions.audit_repository import AuditRepository
 from app.modules.transactions.repository import TransactionRepository
@@ -28,6 +30,8 @@ class TransferService:
             raise ValueError("Cannot transfer to the same account")
         if body.amount <= Decimal("0"):
             raise ValueError("Transfer amount must be positive")
+        if body.source_ref and body.source_ref == body.dest_source_ref:
+            raise ValueError("Each side of a transfer needs its own source reference")
 
         occurred_at = body.occurred_at or datetime.now(UTC)
         async with self._session.begin():
@@ -39,9 +43,17 @@ class TransferService:
                 raise ValueError("Destination account not found")
             if src.currency != dst.currency:
                 raise ValueError("Cross-currency transfers are not supported")
+            for ref in (body.source_ref, body.dest_source_ref):
+                if ref and await self._txs.source_ref_exists(actor.household_id, ref):
+                    raise ConflictError("This transaction was already imported")
 
             period = None
-            if body.monthly_payment_id is not None:
+            plan_item = None
+            if body.plan_item_id is not None:
+                plan_item, period = await linking.resolve_item(
+                    self._session, actor.household_id, body.plan_item_id
+                )
+            elif body.monthly_payment_id is not None:
                 if not await plan_item_exists(
                     self._session, actor.household_id, body.monthly_payment_id
                 ):
@@ -53,6 +65,9 @@ class TransferService:
                         occurred_at, await household_timezone(self._session, actor.household_id)
                     )
                 )
+                plan_item = await linking.item_for_template(
+                    self._session, actor.household_id, body.monthly_payment_id, period
+                )
 
             transfer_id = uuid.uuid4()
             common = {
@@ -61,6 +76,7 @@ class TransferService:
                 "category_slug": "transfer",
                 "occurred_at": occurred_at,
                 "transfer_id": transfer_id,
+                "source": body.source,
             }
             debit = LedgerTransaction(
                 **common,
@@ -69,12 +85,16 @@ class TransferService:
                 description=body.description or f"Transfer to {dst.display_name}",
                 monthly_payment_id=body.monthly_payment_id,
                 period_month=period,
+                source_ref=body.source_ref,
             )
+            if plan_item is not None:
+                linking.link(debit, plan_item, period)
             credit = LedgerTransaction(
                 **common,
                 account_id=dst.id,
                 amount=body.amount,
                 description=body.description or f"Transfer from {src.display_name}",
+                source_ref=body.dest_source_ref,
             )
             src.balance = Decimal(src.balance) - body.amount
             dst.balance = Decimal(dst.balance) + body.amount

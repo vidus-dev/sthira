@@ -12,7 +12,8 @@ from app.models.category import Category
 from app.modules.categories.schemas import CategoryCreate, CategoryRead, CategoryUpdate
 
 # Slugs with a built-in meaning that user categories must not take.
-RESERVED_SLUGS = frozenset({"transfer", "uncategorized"})
+# ``adjustment`` corrects a balance without counting as income or spending.
+RESERVED_SLUGS = frozenset({"transfer", "uncategorized", "adjustment"})
 
 
 def slugify(name: str) -> str:

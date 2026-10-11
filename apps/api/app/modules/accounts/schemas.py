@@ -60,3 +60,21 @@ class AccountRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReconcileBody(BaseModel):
+    """The balance the bank (or wallet, or cash in hand) shows right now."""
+
+    balance: Decimal = Field(decimal_places=4, max_digits=19)
+    # A shortfall counts as spending ("Unaccounted") unless ``as_spending`` is false, in
+    # which case it only corrects the balance. A surplus always only corrects it.
+    as_spending: bool = True
+    occurred_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=512)
+
+
+class ReconcileResult(BaseModel):
+    account: AccountRead
+    # The entry that explains the difference; null when the balance already matched.
+    transaction_id: UUID | None = None
+    difference: Decimal

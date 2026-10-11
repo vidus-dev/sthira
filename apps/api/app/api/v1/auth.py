@@ -7,9 +7,12 @@ from app.auth.login_throttle import clear_login_failures, is_login_throttled, re
 from app.auth.session_user import require_session_user_id, session_user_id_optional
 from app.db.session import get_db
 from app.schemas.auth import (
+    ChangePasswordBody,
     LoginBody,
     ProfileUpdate,
+    RecoveryKeyResponse,
     RegisterBody,
+    ResetPasswordBody,
     SessionResponse,
     UserPublic,
 )
@@ -18,7 +21,11 @@ from app.services.auth_service import (
     create_user,
     get_user_by_email,
     get_user_by_id,
+    hash_password,
+    issue_recovery_key,
+    reset_password_with_key,
     user_public,
+    verify_password,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -110,6 +117,68 @@ async def update_profile(
         user.display_name = body.display_name
     await db.commit()
     return user_public(user)
+
+
+async def _current_user(request: Request, db: AsyncSession):
+    uid = require_session_user_id(request)
+    user = await get_user_by_id(db, uid)
+    if user is None:
+        request.session.clear()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return user
+
+
+@router.post("/recovery-key")
+async def create_recovery_key(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> RecoveryKeyResponse:
+    """Create a new recovery key (replacing any old one). It is shown only this once."""
+    user = await _current_user(request, db)
+    return RecoveryKeyResponse(recovery_key=await issue_recovery_key(db, user))
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: Request,
+    body: ResetPasswordBody,
+    db: AsyncSession = Depends(get_db),
+) -> SessionResponse:
+    """Forgotten password: email + recovery key + new password. Signs you in."""
+    throttle_key = f"reset:{body.email}"
+    if is_login_throttled(throttle_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Try again later.",
+        )
+    user = await reset_password_with_key(db, body.email, body.recovery_key, body.new_password)
+    if user is None:
+        record_login_failure(throttle_key)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="That email and recovery key don't match",
+        )
+    clear_login_failures(throttle_key)
+    clear_login_failures(body.email)
+    request.session.clear()
+    request.session["user_id"] = str(user.id)
+    csrf = _issue_csrf(request)
+    return SessionResponse(authenticated=True, user=user_public(user), csrf_token=csrf)
+
+
+@router.post("/change-password")
+async def change_password(
+    request: Request,
+    body: ChangePasswordBody,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, bool]:
+    user = await _current_user(request, db)
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Your current password isn't right"
+        )
+    user.hashed_password = hash_password(body.new_password)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.post("/logout")

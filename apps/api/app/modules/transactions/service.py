@@ -12,6 +12,7 @@ from app.models.monthly_payment import MonthlyPayment
 from app.models.transaction import LedgerTransaction
 from app.modules.accounts.repository import AccountRepository
 from app.modules.errors import ConflictError
+from app.modules.month_plans import linking
 from app.modules.periods import household_timezone, month_start, period_for
 from app.modules.transactions.audit_repository import AuditRepository
 from app.modules.transactions.idempotency_repository import (
@@ -83,9 +84,17 @@ class TransactionService:
                 raise ConflictError("This transaction was already imported")
 
             period = None
-            if body.monthly_payment_id is not None:
+            plan_item = None
+            if body.plan_item_id is not None:
+                plan_item, period = await linking.resolve_item(
+                    self._session, actor.household_id, body.plan_item_id
+                )
+            elif body.monthly_payment_id is not None:
                 period = await self._plan_period(
                     actor, body.monthly_payment_id, body.period_month, body.occurred_at
+                )
+                plan_item = await linking.item_for_template(
+                    self._session, actor.household_id, body.monthly_payment_id, period
                 )
 
             acc = await self._accounts.get_for_update(actor.household_id, body.account_id)
@@ -105,9 +114,19 @@ class TransactionService:
                 monthly_payment_id=body.monthly_payment_id,
                 period_month=period,
             )
+            if plan_item is not None:
+                linking.link(row, plan_item, period)
             acc.balance = Decimal(acc.balance) + body.amount
             acc.updated_at = datetime.now(UTC)
             await self._repo.add(row)
+            # "Rent 37,000" ticks off this month's rent.
+            await linking.auto_link_bill(
+                self._session,
+                actor.household_id,
+                row,
+                await household_timezone(self._session, actor.household_id),
+            )
+            await self._session.flush()
             read = self._to_read(row)
             await self._audit.append(
                 user_id=actor.user_id,
@@ -133,7 +152,11 @@ class TransactionService:
             if row is None:
                 return None
             data = body.model_dump(exclude_unset=True)
-            plan_fields = {k: data.pop(k) for k in ("monthly_payment_id", "period_month") if k in data}
+            plan_fields = {
+                k: data.pop(k)
+                for k in ("monthly_payment_id", "period_month", "plan_item_id")
+                if k in data
+            }
 
             # A transfer is two legs: amount, date and note changes apply to both, each
             # leg keeping its direction, and both balances move.
@@ -159,7 +182,16 @@ class TransactionService:
                     acc.balance = Decimal(acc.balance) + (leg.amount - old_amount)
                 acc.updated_at = datetime.now(UTC)
 
-            if "monthly_payment_id" in plan_fields:
+            if "plan_item_id" in plan_fields:
+                item_id = plan_fields["plan_item_id"]
+                if item_id is None:
+                    linking.link(row, None, None)
+                else:
+                    item, month = await linking.resolve_item(
+                        self._session, actor.household_id, item_id
+                    )
+                    linking.link(row, item, month)
+            elif "monthly_payment_id" in plan_fields:
                 item_id = plan_fields["monthly_payment_id"]
                 row.monthly_payment_id = item_id
                 row.period_month = (

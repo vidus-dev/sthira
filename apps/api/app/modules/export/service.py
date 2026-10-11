@@ -29,12 +29,18 @@ HEADER = [
     "Source",
 ]
 
-_SPECIAL_SLUGS = {"transfer": "Transfer", "uncategorized": "Uncategorized"}
+_SPECIAL_SLUGS = {
+    "transfer": "Transfer",
+    "uncategorized": "Uncategorized",
+    "adjustment": "Balance correction",
+}
 
 
 def _kind(tx: LedgerTransaction) -> str:
     if tx.transfer_id is not None:
         return "Transfer out" if tx.amount < 0 else "Transfer in"
+    if tx.category_slug == "adjustment":
+        return "Correction"
     return "Expense" if tx.amount < 0 else "Income"
 
 

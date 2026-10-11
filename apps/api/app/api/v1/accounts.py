@@ -7,7 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.actor import Actor, require_actor
 from app.db.session import get_db
-from app.modules.accounts.schemas import AccountCreate, AccountRead, AccountUpdate
+from app.modules.accounts.schemas import (
+    AccountCreate,
+    AccountRead,
+    AccountUpdate,
+    ReconcileBody,
+    ReconcileResult,
+)
 from app.modules.accounts.service import AccountService
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -68,3 +74,17 @@ async def delete_account(
     ok = await svc.delete(actor, account_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+
+
+@router.post("/{account_id}/reconcile", response_model=ReconcileResult)
+async def reconcile_account(
+    account_id: UUID,
+    body: ReconcileBody,
+    actor: Actor = Depends(require_actor),
+    svc: AccountService = Depends(get_account_service),
+) -> ReconcileResult:
+    """Set the balance to what the bank shows; the difference becomes an entry."""
+    result = await svc.reconcile(actor, account_id, body)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    return result

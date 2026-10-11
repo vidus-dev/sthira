@@ -2,6 +2,11 @@
 
 import secrets
 
+# Built-in slugs used by balance checks: money gone without an entry counts as spending
+# under ``unaccounted``; ``adjustment`` only corrects a balance (not income or spending).
+UNACCOUNTED_SLUG = "unaccounted"
+ADJUSTMENT_SLUG = "adjustment"
+
 # (slug, name, kind, icon). Icons are keys the mobile app maps to its line-icon set.
 DEFAULT_CATEGORIES: tuple[tuple[str, str, str, str], ...] = (
     ("food-delivery", "Food delivery", "expense", "bowl"),
@@ -28,6 +33,8 @@ DEFAULT_CATEGORIES: tuple[tuple[str, str, str, str], ...] = (
     ("household", "Household items", "expense", "sofa"),
     ("education", "Education", "expense", "book"),
     ("other", "Other", "expense", "dots"),
+    # Money that left an account without an entry, found by a balance check.
+    ("unaccounted", "Unaccounted", "expense", "question"),
     ("salary", "Salary", "income", "salary"),
     ("other-income", "Other income", "income", "coins"),
     ("interest-refunds", "Interest & refunds", "income", "percent"),

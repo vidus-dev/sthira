@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.rbac import require_admin
 from app.db.session import get_db
 from app.models.user import User
+from app.modules.client_errors.schemas import ClientErrorRead
+from app.modules.client_errors.service import list_client_errors
 from app.schemas.admin import AdminUserRow, AuditEventRow, Page
 from app.services import admin_service
 
@@ -52,3 +54,13 @@ async def list_audit_events(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/client-errors", response_model=list[ClientErrorRead])
+async def recent_client_errors(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=500),
+) -> list[ClientErrorRead]:
+    """Newest crash reports from the phone app."""
+    return [ClientErrorRead.model_validate(r) for r in await list_client_errors(db, limit)]

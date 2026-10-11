@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, model_validator
 from app.modules.transactions.schemas import TransactionRead
 
 AmountType = Literal["fixed", "percent", "variable"]
+# A bill is paid; an allowance is money set aside and spent through the month.
+ItemKind = Literal["bill", "allowance"]
 PlanStatus = Literal["due", "partial", "paid", "awaiting_income"]
 
 DEFAULT_BASE_CATEGORY = "salary"
@@ -32,6 +34,9 @@ class MonthlyPaymentCreate(BaseModel):
     due_day: int | None = Field(default=None, ge=1, le=31)
     sort_order: int | None = Field(default=None, ge=0, le=10_000)
     notes: str | None = Field(default=None, max_length=2000)
+    kind: ItemKind = "bill"
+    dest_account_id: UUID | None = None
+    covers_rest: bool = False
 
     @model_validator(mode="after")
     def _amounts(self) -> Self:
@@ -53,6 +58,9 @@ class MonthlyPaymentUpdate(BaseModel):
     is_active: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=10_000)
     notes: str | None = Field(default=None, max_length=2000)
+    kind: ItemKind | None = None
+    dest_account_id: UUID | None = None
+    covers_rest: bool | None = None
 
 
 class MonthlyPaymentRead(BaseModel):
@@ -68,6 +76,9 @@ class MonthlyPaymentRead(BaseModel):
     is_active: bool
     sort_order: int
     notes: str | None
+    kind: str = "bill"
+    dest_account_id: UUID | None = None
+    covers_rest: bool = False
 
     model_config = {"from_attributes": True}
 

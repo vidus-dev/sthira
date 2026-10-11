@@ -12,6 +12,7 @@ class CsrfProtectMiddleware(BaseHTTPMiddleware):
         {
             "/v1/auth/login",
             "/v1/auth/register",
+            "/v1/auth/reset-password",
         }
     )
 

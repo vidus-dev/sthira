@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.actor import Actor
 from app.models.household import Household
 from app.models.transaction import LedgerTransaction
+from app.modules.households.defaults import ADJUSTMENT_SLUG
 from app.modules.periods import add_months, local_date, month_bounds
 from app.modules.summary.schemas import (
     CategoryTotal,
@@ -31,6 +32,8 @@ class SummaryService:
             LedgerTransaction.household_id == actor.household_id,
             LedgerTransaction.deleted_at.is_(None),
             LedgerTransaction.transfer_id.is_(None),
+            # Balance corrections are neither income nor spending.
+            LedgerTransaction.category_slug != ADJUSTMENT_SLUG,
             LedgerTransaction.occurred_at >= start,
             LedgerTransaction.occurred_at < end,
         )

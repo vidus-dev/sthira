@@ -1,3 +1,5 @@
+import secrets
+from datetime import UTC, datetime
 from uuid import UUID
 
 import bcrypt
@@ -58,7 +60,48 @@ def user_public(user: User) -> UserPublic:
         role=user.role,
         display_name=user.display_name,
         household_id=str(user.household_id),
+        has_recovery_key=user.recovery_key_hash is not None,
     )
+
+
+# No 0/O/1/I/L so a key copied onto paper reads back cleanly.
+_KEY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_recovery_key() -> str:
+    """``7KQM-4ZTX-P9WD-3HCN`` — 16 characters (~79 bits), grouped for writing down."""
+    chars = "".join(secrets.choice(_KEY_ALPHABET) for _ in range(16))
+    return "-".join(chars[i : i + 4] for i in range(0, 16, 4))
+
+
+def normalize_recovery_key(raw: str) -> str:
+    cleaned = "".join(ch for ch in raw.upper() if ch.isalnum())
+    return "-".join(cleaned[i : i + 4] for i in range(0, len(cleaned), 4))
+
+
+async def issue_recovery_key(db: AsyncSession, user: User) -> str:
+    """Create (or replace) the user's recovery key; the plain key is returned once."""
+    key = new_recovery_key()
+    user.recovery_key_hash = hash_password(key)
+    user.recovery_key_created_at = datetime.now(UTC)
+    await db.commit()
+    return key
+
+
+async def reset_password_with_key(
+    db: AsyncSession, email: str, recovery_key: str, new_password: str
+) -> User | None:
+    """Set a new password if the recovery key matches. The key is used up."""
+    user = await get_user_by_email(db, email)
+    if user is None or user.recovery_key_hash is None:
+        return None
+    if not verify_password(normalize_recovery_key(recovery_key), user.recovery_key_hash):
+        return None
+    user.hashed_password = hash_password(new_password)
+    user.recovery_key_hash = None
+    user.recovery_key_created_at = None
+    await db.commit()
+    return user
 
 
 async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:

@@ -1,15 +1,25 @@
 """Account use-cases."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.actor import Actor
 from app.models.account import FinancialAccount
+from app.models.transaction import LedgerTransaction
 from app.modules.accounts.repository import AccountRepository
-from app.modules.accounts.schemas import AccountCreate, AccountRead, AccountUpdate
+from app.modules.accounts.schemas import (
+    AccountCreate,
+    AccountRead,
+    AccountUpdate,
+    ReconcileBody,
+    ReconcileResult,
+)
+from app.modules.households.defaults import ADJUSTMENT_SLUG, UNACCOUNTED_SLUG
 from app.modules.households.service import member_ids
+from app.modules.transactions.audit_repository import AuditRepository
 
 
 class AccountService:
@@ -73,6 +83,49 @@ class AccountService:
         await self._session.commit()
         await self._session.refresh(row)
         return self._to_read(row)
+
+    async def reconcile(
+        self, actor: Actor, account_id: UUID, body: ReconcileBody
+    ) -> ReconcileResult | None:
+        """Bring the balance in line with the bank's, recording the difference as an entry.
+
+        Unlike editing the balance directly, the gap stays visible in Activity and the
+        month's totals: a shortfall is "Unaccounted" spending (or a plain correction).
+        """
+        async with self._session.begin():
+            acc = await self._repo.get_for_update(actor.household_id, account_id)
+            if acc is None:
+                return None
+            difference = body.balance - Decimal(acc.balance)
+            tx_id = None
+            if difference != 0:
+                spending = difference < 0 and body.as_spending
+                row = LedgerTransaction(
+                    user_id=actor.user_id,
+                    household_id=actor.household_id,
+                    account_id=acc.id,
+                    amount=difference,
+                    category_slug=UNACCOUNTED_SLUG if spending else ADJUSTMENT_SLUG,
+                    description=body.note
+                    or ("Not recorded (balance check)" if spending else "Balance correction"),
+                    occurred_at=body.occurred_at or datetime.now(UTC),
+                )
+                self._session.add(row)
+                acc.balance = body.balance
+                acc.updated_at = datetime.now(UTC)
+                await self._session.flush()
+                tx_id = row.id
+                await AuditRepository(self._session).append(
+                    user_id=actor.user_id,
+                    action="account.reconcile",
+                    entity_type="financial_account",
+                    entity_id=acc.id,
+                    payload={"difference": str(difference), "transaction_id": str(row.id)},
+                )
+            await self._session.refresh(acc)
+            return ReconcileResult(
+                account=self._to_read(acc), transaction_id=tx_id, difference=difference
+            )
 
     async def delete(self, actor: Actor, account_id: UUID) -> bool:
         row = await self._repo.get(actor.household_id, account_id)

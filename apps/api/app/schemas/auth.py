@@ -40,6 +40,8 @@ class UserPublic(BaseModel):
     role: str = "user"
     display_name: str | None = None
     household_id: str | None = None
+    # Whether a recovery key is set (for resetting a forgotten password).
+    has_recovery_key: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -48,3 +50,20 @@ class SessionResponse(BaseModel):
     authenticated: bool
     user: UserPublic | None = None
     csrf_token: str | None = None
+
+
+class RecoveryKeyResponse(BaseModel):
+    """Shown once; only a hash is stored."""
+
+    recovery_key: str
+
+
+class ResetPasswordBody(BaseModel):
+    email: EmailStr
+    recovery_key: str = Field(min_length=8, max_length=64)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)

@@ -59,6 +59,7 @@ class MonthlyPaymentService:
 
     async def create(self, actor: Actor, body: MonthlyPaymentCreate) -> MonthlyPaymentRead:
         await self._check_account(actor, body.default_account_id)
+        await self._check_account(actor, body.dest_account_id)
         sort_order = body.sort_order
         if sort_order is None:
             sort_order = await self._session.scalar(
@@ -79,6 +80,9 @@ class MonthlyPaymentService:
             due_day=body.due_day,
             sort_order=sort_order,
             notes=body.notes,
+            kind=body.kind,
+            dest_account_id=body.dest_account_id,
+            covers_rest=body.covers_rest,
         )
         self._session.add(row)
         await self._session.commit()
@@ -92,8 +96,9 @@ class MonthlyPaymentService:
         if row is None:
             return None
         data = body.model_dump(exclude_unset=True)
-        if "default_account_id" in data:
-            await self._check_account(actor, data["default_account_id"])
+        for key in ("default_account_id", "dest_account_id"):
+            if key in data:
+                await self._check_account(actor, data[key])
         for key, value in data.items():
             setattr(row, key, value)
         check_amounts(row.amount_type, row.amount, row.percent)
