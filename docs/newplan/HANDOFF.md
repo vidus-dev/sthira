@@ -1,6 +1,6 @@
 # Sthira — handoff: everything built, done, and still to do
 
-**State as of 9 Oct 2026.** Read this first if you are a developer or a Claude session
+**State as of 11 Oct 2026.** Read this first if you are a developer or a Claude session
 picking up the project. It is meant to be complete: product context, decisions and the
 owner's preferences, how every part works, how it was verified, known issues, and the
 exact next steps. The other files in this folder go deeper on specific topics:
@@ -30,8 +30,18 @@ exact next steps. The other files in this folder go deeper on specific topics:
 - **Hosted (9 Oct 2026):** API live at <https://sthira-api-oes4.onrender.com> (Render free,
   Singapore, deploys `phase-1-onyx` on every push) on Neon Postgres (Singapore, free).
   Expo project **@vidus-ai/sthira**; first APK build started (see §12, Phase 4).
-- **Next:** owner installs the APK and uses it for 3–4 days (Phase 5), *then* merge
-  `phase-1-onyx` into `main` and switch Render to `main`. Later Phase 6 (SMS), Phase 7 (AI).
+- **Now (from 10 Oct 2026):** the APK is installed on the owner's phone and the 3–4 day
+  trial (Phase 5) is running. *Then* merge `phase-1-onyx` into `main` and switch Render to
+  `main`. Parked ideas waiting for a go-ahead are in §12 "Parked — discussed, not
+  started". Later Phase 6 (SMS), Phase 7 (AI).
+- **11 Oct 2026 — app 1.1.0 built on branch `phase-2-catchup` (not committed yet):** the
+  catch-up release — bank SMS inbox (Phase 6's core, pulled forward), balance check,
+  "type several", offline outbox, password recovery key, crash reports, privacy screen,
+  reminders, "Update ready — Restart", keyboard-safe sheets, nightly DB backup. Needs a
+  new APK. Details and release steps in §12 "Catch-up release (1.1.0)".
+- **Also 11 Oct — month-by-month plan** (same branch): each month its own plan, rules for
+  what carries over, bills vs allowances, bucket accounts, auto-ticking. §12
+  "Month-by-month plan".
 
 ---
 
@@ -472,11 +482,10 @@ screens (Home, Add expense, Monthly plan, Insights).
   week/year); "Sthira noticed" is rule-based; no AI "Ask" or SMS inbox yet.
 - Joining a household is only possible from an **empty** account (by design; no merge).
   No "leave household" / remove member yet.
-- Percent items use salary received in the **same calendar month**; if salary lands on
-  the 30th/31st the user picks the month when paying (no "use last month's salary"
-  option).
+- ~~Percent items use salary received in the same calendar month~~ — month plans use
+  salary from the last day of the previous month (or a hand-set amount).
 - Positive non-transfer entries (refunds) count as income in summaries.
-- Editing an account balance overwrites it (no adjusting entry/audit).
+- ~~Editing an account balance overwrites it~~ — 1.1.0 records an adjustment entry.
 - Web preview only: Rise entrance animations off; a button-inside-row warning was fixed by
   using visual `Pill`s.
 - Render free tier sleeps after ~15 min idle (first request ~1 min). Mitigated by a
@@ -509,7 +518,7 @@ Steps used (for redoing it elsewhere):
 4. Check `https://<name>.onrender.com/v1/health/live`; register the owner's real account.
 5. Decide free vs Starter (~$7/mo, no sleep).
 
-### Phase 4 — build and install the APK — **build started 9 Oct 2026**
+### Phase 4 — build and install the APK — **DONE 10 Oct 2026**
 Done so far:
 - Expo account `vidus-dev` (Google sign-in → log in with `npx eas-cli@latest login`,
   browser flow; the old CLI's password prompt can't work). Project **@vidus-ai/sthira**
@@ -531,10 +540,155 @@ Releasing changes afterwards:
   `version` bump in `app.json`: new `eas build` and reinstall. Bumping `version` changes
   the runtime version, so older APKs stop receiving updates.
 
-Still to do:
-1. Install the APK on the owner's phone; sign up with the real email (hosted DB starts
-   empty; the demo account exists only locally).
-2. Test on device: fingerprint lock, haptics, CSV share sheet, light mode, drag-to-close.
+Status:
+- First APK built (build `58060c3d-230e-4c15-9bab-e0437c5a87de`) and **installed** on the
+  owner's phone; the owner signed up on the hosted server.
+- First over-the-air update published 10 Oct (offline-first start, 180-day session,
+  app lock on by default with fingerprint or phone PIN).
+- Render keep-awake: the owner set up a cron-job.org job hitting `/v1/health/live` every
+  10 minutes (free; Render's 750 free hours cover one service all month).
+- How updates reach the phone (explained to the owner): on each launch the app checks
+  the `preview` channel for an update matching runtime `1.0.0`, downloads it in the
+  background, and runs it on the **next** cold start (so: open, close fully, reopen).
+  A crash on a new update rolls back to the previous one automatically.
+
+Still to verify on the device: the fingerprint **and** phone-PIN unlock (can't be tested
+in the browser preview), haptics, CSV share sheet, light mode, drag-to-close.
+
+### Catch-up release (1.1.0) — **built 11 Oct 2026, not released**
+Why: the owner fell 3 days behind and won't enter things one by one. Branch
+`phase-2-catchup` (from `phase-1-onyx`), uncommitted at the time of writing.
+
+What's in it:
+- **Bank SMS → review inbox** (Home inbox button, champagne dot when SMS wait; Settings →
+  Catch up). Native module `apps/mobile/modules/sms-inbox` (Kotlin, Expo Modules API,
+  autolinked from `modules/`) reads the inbox since a timestamp; **people's numbers and
+  OTPs are filtered out in native code**. `src/features/sms/parser.ts` parses HDFC / SBI /
+  ICICI / Axis / Kotak style alerts and ignores dues, collect requests, autopay notices,
+  offers, declined payments and statements. `drafts.ts` matches accounts by last digits
+  (then bank name), suggests categories from past notes then keywords, pairs a debit and
+  a same-amount credit between own accounts within 45 min into one transfer, flags likely
+  duplicates of hand-entered rows, and drops SMS from before an account was added (its
+  opening balance already includes them). Confirmed drafts go through the outbox with
+  `source='sms'` + `source_ref` (FNV hash of sender|date|body); transfers carry both
+  legs' refs (`source_ref`, `dest_source_ref`). Skips are remembered per user in
+  AsyncStorage. Raw SMS text never leaves the phone; drafts aren't persisted in the
+  query cache.
+- **Check balances** (`ReconcileScreen`): type what each bank shows; `POST
+  /v1/accounts/{id}/reconcile` records the gap as `unaccounted` spending (new default
+  category, seeded by migration 0006) or as an `adjustment` (reserved slug, excluded from
+  summaries/Activity totals). Shows the last SMS "Avl bal" as a hint. Blocked while the
+  outbox has unsynced entries. Editing an account's balance now also records an
+  adjustment instead of overwriting silently.
+- **Type several** (`BatchSheet`, `batch.ts`): "swiggy 450 hdfc, milk 60 cash, +85000
+  salary", one day for all, default account chips.
+- **Outbox** (`src/api/outbox.ts`): every quick-add / batch / SMS entry is saved on the
+  phone, sent in order with a stable Idempotency-Key, retried with backoff on
+  network/5xx/401, and shown as "Waiting to sync" (balances include it). Survives restarts
+  and sign-outs (sent when the same user signs in).
+- **Password recovery without email:** `POST /v1/auth/recovery-key` (shown once, bcrypt
+  hash stored), `POST /v1/auth/reset-password` (email + key + new password, throttled,
+  key used up, signs in), `POST /v1/auth/change-password`. Sign-in → "Forgot password?";
+  Settings → Sign-in → Recovery key / Change password. `UserPublic.has_recovery_key`.
+- **Crash reports:** `src/core/crash.tsx` (global handler + ErrorBoundary with a calm
+  restart screen) stores reports on the phone and posts them to `POST
+  /v1/client-errors` (table `client_errors`, 30/user/hour); admins read `GET
+  /v1/admin/client-errors`, or query the table in Neon.
+- **Privacy screen** (expo-screen-capture, on by default): blank in Recent apps, no
+  screenshots. Settings toggle — turn it off to take screenshots.
+- **Reminders** (expo-notifications, local only): plan items 2 days before and on the due
+  day at 9 AM; evening nudge (8/9/10 PM) on days with nothing added. Re-planned whenever
+  the plan or entries change; tapping opens Plan / quick add.
+- **Update banner:** "Update ready · Restart" once an OTA update has downloaded; also
+  checks on resume (every 15 min at most).
+- **Bottom sheets fit above the keyboard** (owner's bug report: the plan-item sheet slid
+  under the status bar). `Sheet` measures the keyboard's top edge and limits its height.
+- **Nightly backup** `.github/workflows/backup.yml`: pg_dump → gpg (AES256) → 30-day
+  private artifact. Needs secrets `BACKUP_DATABASE_URL` (libpq form, `sslmode=require`)
+  and `BACKUP_PASSPHRASE`. Scheduled workflows only run from the default branch, so it
+  starts once merged to `main` (can be run by hand before that).
+- `app.json` version **1.1.0** (new runtime → old APKs stop getting OTA updates, which is
+  right: they lack the native modules), permissions `READ_SMS` + `POST_NOTIFICATIONS`,
+  notification icon `assets/notification-icon.png`; `eas.json` preview `autoIncrement`.
+
+Verified: API 174 tests pass (88%), ruff clean, migration 0006 up/down/up; mobile
+`tsc` clean, `npm run test:sms -w mobile` (23 SMS samples) and `npm run test:catchup -w
+mobile` (drafts, pairing, duplicates, batch parsing) pass; Android JS bundle exports;
+throwaway `expo prebuild` showed the permissions in the manifest; browser preview
+screenshots of Home, Catch up, Type several, Check balances, Settings, Recovery key and
+Forgot password, and a batch entry synced through the outbox into Postgres. **Not
+verified:** the Kotlin module compiling (no Android SDK on the laptop — EAS compiles
+it), reading real SMS, notifications, privacy screen, keyboard fix on a device.
+
+Release steps:
+1. Owner says go → commit; get the API live first: merge `phase-2-catchup` into the
+   branch Render deploys (or point Render at it). Migration 0006 runs on start. The new
+   API is backward compatible with the 1.0.0 APK.
+2. `cd apps/mobile && npx eas-cli@latest build -p android --profile preview`, install
+   over the old app (same EAS keystore; data is on the server).
+3. On the phone: Catch up → Allow SMS access (Android 13+: App info → ⋮ → Allow
+   restricted settings first), allow notifications, create a recovery key.
+4. Add the two backup secrets in GitHub.
+5. Collect real bank SMS formats the parser misses and add them to
+   `scripts/test-sms-parser.mjs`.
+
+### Month-by-month plan — **built 11 Oct 2026, not released** (same branch)
+Why: the owner's notebook (photos, 11 Oct) has a separate plan list per month, written
+around the 5th, with ticks; items are copied month to month, some amounts change, 10%/5%
+follow the salary that lands on the last day of the previous month or the 1st, and
+money goes to own bucket accounts (5% → account 1234, groceries + non-veg → ICICI,
+medicines → 9796). Misc is fixed for the owner but the rule is per item.
+
+Model (migration `0007_month_plans`):
+- `month_plans` (household, month, `salary_override`, `reviewed_at`) and
+  `month_plan_items` (a copy per month: name, category, `kind` bill|allowance,
+  `amount_type` fixed|percent|variable, amount/percent, `covers_rest`,
+  `dest_account_id` = bucket, `default_account_id`, due day, `closed`, `carried_over`,
+  `carried_from_id`, `template_id`). `monthly_payments` are now the **repeating rules**
+  (+ `kind`, `dest_account_id`, `covers_rest`); `template_id` NULL = only this month.
+- `ledger_transactions.plan_item_id` links a payment (or a transfer's outgoing leg) to
+  a month line; `monthly_payment_id` + `period_month` are kept in step, so the old
+  `/v1/monthly-payments/status` (used by app 1.0.0) keeps working.
+
+Rules (`app/modules/month_plans/`):
+- A month's plan is created the first time it is opened (`GET /v1/plans/{y}/{m}`, up to
+  next month; months before the household existed are shown empty and not stored).
+  Active rules are copied: fixed keeps its amount, variable starts blank (hint = last
+  month's amount, else the rule's old estimate), percent is computed from the month's
+  salary. Payments already made that month are linked: first by rule + period, then
+  unlinked expenses by category to unpaid bills (rent paid on the 1st, plan on the 5th).
+- Salary for month M = salary entries from the last day of M-1 up to (not incl.) the
+  last day of M, or `salary_override`.
+- Bills: due / partial / paid / awaiting_income / needs_amount. Allowances with a bucket:
+  "paid" = moved in (linked transfers, plus unlinked transfers into that account that
+  month, allocated in order); allowances without a bucket are `tracking`. Allowance
+  `spent` = that category's spending (bill payments excluded); `covers_rest` = spending
+  in categories no other line uses. Buckets: per account, set aside but unspent vs the
+  balance → `short`.
+- New expenses auto-link to the month's unpaid bill in the same category
+  (`linking.auto_link_bill`, in `TransactionService.create`; covers quick add, batch,
+  SMS); the app shows "Counted as October Rent · Undo" (PATCH `plan_item_id: null`).
+- Edits: `scope: "month"` or `"future"` (updates the rule and later months' unpaid
+  copies); `repeat: false` stops it coming back; add with `repeat`; delete with
+  `also_future`; `close` = mark done; `carry` moves last month's unpaid bill into this
+  month (as a one-off line) or marks it done.
+
+App: Plan tab rebuilt (`features/plan/`: `PlanScreen`, `LineSheet` pay/move/fill amount,
+`LineEditor` with the "Only October / October and later" question, `SalarySheet`,
+`planText` suggestions from the notebook). Sections: ready card (Done), left from last
+month, dial, salary card, To fill, Bills, Allowances (spent/left bars), Buckets (short →
+Top up opens a prefilled transfer), Settled, Suggested. Home: "October plan ready · N
+amounts to fill" card; Up next / Safe today / forecast read the month plan. Reminders
+use it too (next month's plan is only opened from the 25th). Old `PlanItemsScreen` and
+`PaySheet` removed; Settings → Monthly plan opens the Plan tab.
+
+Verified: 4 integration scenarios in `tests/integration/test_month_plans.py` (a month
+like the notebook incl. bucket shortfall, month-vs-future edits and rollover, salary
+window/override/limits/scoping, HTTP + undo auto-link); full API suite 178 passed (89%);
+mobile tsc clean; browser preview walkthrough with the demo account (plan ready card,
+fill an amount, edit sheet, Done, add Groceries as an allowance → move ₹5,000 to the
+bucket → "₹3,760 left", bucket "covered"). Ships with the server update; as an OTA on
+the 1.1.0 runtime (no extra APK).
 
 ### Phase 5 — real use
 Owner adds real accounts with today's balances, salary, monthly plan (templates), and
@@ -550,6 +704,40 @@ server-side). Mine `origin/feature/sms-ingest*` for prior work.
 `POST /v1/assistant/ask` using the Anthropic Python SDK tool runner, model
 `claude-opus-5-5` by default, read-only tools over the existing services, API key only on
 the server, then the "Ask" entry on Home/Insights.
+
+### Parked — discussed, not started (10 Oct 2026)
+The owner asked about these and said to note them and wait. **Don't build them until the
+owner says so** — the 3–4 day trial may change what they want.
+
+1. **Total balance history on Home** (owner asked "would you show the total balance
+   history of all the banks in home page?"). Proposed answer, not yet approved:
+   - *Home:* a thin sparkline under the big total-balance number showing the last 3
+     months, plus one line like "↗ ₹12,400 since July" (green if up). Glanceable only:
+     Home already has the Spending pace chart, Up next and Recent, so no second big chart.
+   - *Tap it:* a full view (or an Insights section) with 1M / 3M / 6M / 1Y ranges, drag to
+     read the total on any date, and the split by bank.
+   - *Same definition as the big number:* the sum of all accounts (credit cards
+     negative), so the last point equals the Home total.
+   - *Server (planned):* `GET /v1/summary/balance-history?days=N` in
+     `app/modules/summary`, returning one point per local day (household timezone).
+     Rebuild backwards from current balances: end-of-day(D) = current balance − Σ active
+     entries with local date > D. Transfers net to zero; deleted entries are excluded. An
+     account contributes 0 before its `created_at` day, so history starts the day
+     accounts were added. Limits: direct balance edits on an account aren't recorded, so
+     they show as if the balance had always been that way; entries backdated before an
+     account was created are ignored.
+2. **Savings section** (owner asked "is there anything specific that shows my savings
+   across all banks?"). Today's answer:
+   - The Home total covers all accounts; Accounts shows per-account balances grouped by
+     type; "saved so far in <month>" = income − spending, with transfers excluded.
+   - Missing: a monthly savings trend (6–12 months), a savings rate (% of salary), and a
+     per-bank split chart. The trend and rate can use `GET /summary/month` per month (or a
+     small multi-month endpoint); the split uses accounts.
+3. ~~**Apply updates on the first open**~~ — done in 1.1.0 as the "Update ready ·
+   Restart" banner. Original note: Options offered: a small
+   "Update ready — Restart" prompt (recommended) or a silent restart once the download
+   finishes (`expo-updates` `checkForUpdateAsync`/`fetchUpdateAsync`/`reloadAsync`). No
+   answer yet; the current behaviour stays.
 
 ### Backlog / nice to have
 Merge `phase-1-onyx` (+ run CI) · fix the poetry-in-container docs/CI issue · refresh

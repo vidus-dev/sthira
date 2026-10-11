@@ -1,0 +1,61 @@
+# Nightly encrypted backup of the production database (Neon) as a private workflow artifact.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   BACKUP_DATABASE_URL  Neon connection string in libpq form:
+#                        postgresql://neondb_owner:...@ep-....aws.neon.tech/neondb?sslmode=require
+#                        (the plain "postgresql://" form, not the "+asyncpg" one the API uses)
+#   BACKUP_PASSPHRASE    a long random passphrase; keep a copy outside GitHub
+#
+# Restore: download the artifact, then
+#   gpg --decrypt sthira-YYYY-MM-DD.dump.gpg > sthira.dump
+#   pg_restore --no-owner --clean --if-exists -d "<target database url>" sthira.dump
+name: Database backup
+
+on:
+  schedule:
+    - cron: "30 20 * * *" # 02:00 India time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check secrets
+        env:
+          DB: ${{ secrets.BACKUP_DATABASE_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$PASS" ]; then
+            echo "::error::Set BACKUP_DATABASE_URL and BACKUP_PASSPHRASE repository secrets."
+            exit 1
+          fi
+
+      - name: Dump (pg_dump 17 reads Postgres 14–17)
+        env:
+          DB: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          docker run --rm -e DB -v "$PWD:/out" postgres:17-alpine \
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DB" > /out/sthira.dump'
+          test -s sthira.dump
+          ls -lh sthira.dump
+
+      - name: Encrypt
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          name="sthira-$(date -u +%F).dump.gpg"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" \
+            --symmetric --cipher-algo AES256 --output "$name" sthira.dump
+          rm sthira.dump
+          echo "BACKUP_FILE=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
+          if-no-files-found: error
