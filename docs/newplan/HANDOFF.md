@@ -555,7 +555,12 @@ Status:
 Still to verify on the device: the fingerprint **and** phone-PIN unlock (can't be tested
 in the browser preview), haptics, CSV share sheet, light mode, drag-to-close.
 
-### Catch-up release (1.1.0) — **built 11 Oct 2026, not released**
+### Catch-up release (1.1.0) — **released 11 Oct 2026**
+Committed on `phase-2-catchup` (4 commits) and fast-forwarded `phase-1-onyx`, so Render
+deployed it (migrations 0006 + 0007 ran; new endpoints verified live). APK 1.1.0 built:
+EAS build `d46d2a63-8796-44b9-8672-b5428f8b8337` (the Kotlin SMS module compiled).
+Still to verify on the phone: SMS reading, notifications, privacy screen, keyboard fix.
+
 Why: the owner fell 3 days behind and won't enter things one by one. Branch
 `phase-2-catchup` (from `phase-1-onyx`), uncommitted at the time of writing.
 
@@ -632,7 +637,7 @@ Release steps:
 5. Collect real bank SMS formats the parser misses and add them to
    `scripts/test-sms-parser.mjs`.
 
-### Month-by-month plan — **built 11 Oct 2026, not released** (same branch)
+### Month-by-month plan — **released 11 Oct 2026** (same branch and APK)
 Why: the owner's notebook (photos, 11 Oct) has a separate plan list per month, written
 around the 5th, with ticks; items are copied month to month, some amounts change, 10%/5%
 follow the salary that lands on the last day of the previous month or the 1st, and
