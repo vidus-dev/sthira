@@ -106,6 +106,63 @@ export interface paths {
         patch: operations["update_profile_v1_auth_me_patch"];
         trace?: never;
     };
+    "/v1/auth/recovery-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Recovery Key
+         * @description Create a new recovery key (replacing any old one). It is shown only this once.
+         */
+        post: operations["create_recovery_key_v1_auth_recovery_key_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Password
+         * @description Forgotten password: email + recovery key + new password. Signs you in.
+         */
+        post: operations["reset_password_v1_auth_reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_v1_auth_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -264,6 +321,26 @@ export interface paths {
         head?: never;
         /** Update Account */
         patch: operations["update_account_v1_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/v1/accounts/{account_id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconcile Account
+         * @description Set the balance to what the bank shows; the difference becomes an entry.
+         */
+        post: operations["reconcile_account_v1_accounts__account_id__reconcile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/categories": {
@@ -426,6 +503,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/plans/{year}/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Plan
+         * @description The month's plan, created from the repeating items the first time it's opened.
+         */
+        get: operations["get_plan_v1_plans__year___month__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Plan
+         * @description Set the salary the % items use (null = from salary entries) or mark it reviewed.
+         */
+        patch: operations["update_plan_v1_plans__year___month__patch"];
+        trace?: never;
+    };
+    "/v1/plans/{year}/{month}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Line */
+        post: operations["add_line_v1_plans__year___month__items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plans/{year}/{month}/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Line */
+        delete: operations["delete_line_v1_plans__year___month__items__item_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Line
+         * @description ``scope: "month"`` changes only this month; ``"future"`` also the following ones.
+         */
+        patch: operations["update_line_v1_plans__year___month__items__item_id__patch"];
+        trace?: never;
+    };
+    "/v1/plans/{year}/{month}/items/{item_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay Line
+         * @description Pay a bill, or move an item's money to its bucket account.
+         */
+        post: operations["pay_line_v1_plans__year___month__items__item_id__pay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plans/{year}/{month}/items/{item_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Line
+         * @description Mark done by hand (or undo).
+         */
+        post: operations["close_line_v1_plans__year___month__items__item_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plans/{year}/{month}/carry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Carry
+         * @description Last month's unpaid bill: move it into this month, or mark it done.
+         */
+        post: operations["carry_v1_plans__year___month__carry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/summary/month": {
         parameters: {
             query?: never;
@@ -497,6 +696,23 @@ export interface paths {
         patch: operations["update_budget_v1_budgets__budget_id__patch"];
         trace?: never;
     };
+    "/v1/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Client Error */
+        post: operations["report_client_error_v1_client_errors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -523,6 +739,26 @@ export interface paths {
         };
         /** List Audit Events */
         get: operations["list_audit_events_v1_admin_audit_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent Client Errors
+         * @description Newest crash reports from the phone app.
+         */
+        get: operations["recent_client_errors_v1_admin_client_errors_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -701,6 +937,23 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * BucketCheck
+         * @description Money set aside in an account but not spent yet, against what's in it now.
+         */
+        BucketCheck: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Balance */
+            balance: string;
+            /** Reserved */
+            reserved: string;
+            /** Short */
+            short: string;
+        };
         /** BudgetCreate */
         BudgetCreate: {
             /** Category Slug */
@@ -762,6 +1015,19 @@ export interface components {
             /** Currency */
             currency?: string | null;
         };
+        /** CarryBody */
+        CarryBody: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "done";
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -817,6 +1083,77 @@ export interface components {
             sort_order?: number | null;
             /** Is Archived */
             is_archived?: boolean | null;
+        };
+        /** ChangePasswordBody */
+        ChangePasswordBody: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** ClientErrorAccepted */
+        ClientErrorAccepted: {
+            /** Stored */
+            stored: boolean;
+        };
+        /** ClientErrorCreate */
+        ClientErrorCreate: {
+            /** Message */
+            message: string;
+            /** Stack */
+            stack?: string | null;
+            /**
+             * Fatal
+             * @default false
+             */
+            fatal: boolean;
+            /** App Version */
+            app_version?: string | null;
+            /** Platform */
+            platform?: string | null;
+            /** Context */
+            context?: {
+                [key: string]: unknown;
+            } | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+        };
+        /** ClientErrorRead */
+        ClientErrorRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Message */
+            message: string;
+            /** Stack */
+            stack: string | null;
+            /** Fatal */
+            fatal: boolean;
+            /** App Version */
+            app_version: string | null;
+            /** Platform */
+            platform: string | null;
+            /** Context */
+            context: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** DayTotal */
         DayTotal: {
@@ -976,6 +1313,98 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** LineClose */
+        LineClose: {
+            /**
+             * Closed
+             * @default true
+             */
+            closed: boolean;
+        };
+        /** LineCreate */
+        LineCreate: {
+            /** Name */
+            name: string;
+            /** Category Slug */
+            category_slug: string;
+            /**
+             * Kind
+             * @default bill
+             * @enum {string}
+             */
+            kind: "bill" | "allowance";
+            /**
+             * Amount Type
+             * @default fixed
+             * @enum {string}
+             */
+            amount_type: "fixed" | "percent" | "variable";
+            /** Amount */
+            amount?: number | string | null;
+            /** Percent */
+            percent?: number | string | null;
+            /** Covers Rest */
+            covers_rest?: boolean | null;
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+            /** Default Account Id */
+            default_account_id?: string | null;
+            /** Due Day */
+            due_day?: number | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Repeat
+             * @default true
+             */
+            repeat: boolean;
+        };
+        /** LinePay */
+        LinePay: {
+            /** Account Id */
+            account_id?: string | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Move */
+            move?: boolean | null;
+            /** Description */
+            description?: string | null;
+        };
+        /** LineUpdate */
+        LineUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category Slug */
+            category_slug?: string | null;
+            /** Kind */
+            kind?: ("bill" | "allowance") | null;
+            /** Amount Type */
+            amount_type?: ("fixed" | "percent" | "variable") | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Percent */
+            percent?: number | string | null;
+            /** Covers Rest */
+            covers_rest?: boolean | null;
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+            /** Default Account Id */
+            default_account_id?: string | null;
+            /** Due Day */
+            due_day?: number | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Scope
+             * @default month
+             * @enum {string}
+             */
+            scope: "month" | "future";
+            /** Repeat */
+            repeat?: boolean | null;
+        };
         /** LoginBody */
         LoginBody: {
             /**
@@ -995,6 +1424,34 @@ export interface components {
             user_id: string;
             /** Expense */
             expense: string;
+        };
+        /** MonthPlanRead */
+        MonthPlanRead: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Exists */
+            exists: boolean;
+            /** Reviewed */
+            reviewed: boolean;
+            salary: components["schemas"]["PlanSalary"];
+            /** Items */
+            items: components["schemas"]["PlanLine"][];
+            /** Planned Total */
+            planned_total: string;
+            /** Done Total */
+            done_total: string;
+            /** Settled Count */
+            settled_count: number;
+            /** Total Count */
+            total_count: number;
+            /** Needs Amount Count */
+            needs_amount_count: number;
+            /** Buckets */
+            buckets: components["schemas"]["BucketCheck"][];
+            /** Previous Unpaid */
+            previous_unpaid: components["schemas"]["UnpaidLine"][];
         };
         /**
          * MonthSummary
@@ -1053,6 +1510,19 @@ export interface components {
             sort_order?: number | null;
             /** Notes */
             notes?: string | null;
+            /**
+             * Kind
+             * @default bill
+             * @enum {string}
+             */
+            kind: "bill" | "allowance";
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+            /**
+             * Covers Rest
+             * @default false
+             */
+            covers_rest: boolean;
         };
         /** MonthlyPaymentRead */
         MonthlyPaymentRead: {
@@ -1083,6 +1553,18 @@ export interface components {
             sort_order: number;
             /** Notes */
             notes: string | null;
+            /**
+             * Kind
+             * @default bill
+             */
+            kind: string;
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+            /**
+             * Covers Rest
+             * @default false
+             */
+            covers_rest: boolean;
         };
         /** MonthlyPaymentUpdate */
         MonthlyPaymentUpdate: {
@@ -1108,6 +1590,12 @@ export interface components {
             sort_order?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Kind */
+            kind?: ("bill" | "allowance") | null;
+            /** Dest Account Id */
+            dest_account_id?: string | null;
+            /** Covers Rest */
+            covers_rest?: boolean | null;
         };
         /** MonthlyPlanStatus */
         MonthlyPlanStatus: {
@@ -1193,6 +1681,88 @@ export interface components {
             /** Payments */
             payments: components["schemas"]["TransactionRead"][];
         };
+        /** PlanLine */
+        PlanLine: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Template Id */
+            template_id: string | null;
+            /** Repeats */
+            repeats: boolean;
+            /** Name */
+            name: string;
+            /** Category Slug */
+            category_slug: string;
+            /** Kind */
+            kind: string;
+            /** Amount Type */
+            amount_type: string;
+            /** Amount */
+            amount: string | null;
+            /** Percent */
+            percent: string | null;
+            /** Covers Rest */
+            covers_rest: boolean;
+            /** Dest Account Id */
+            dest_account_id: string | null;
+            /** Default Account Id */
+            default_account_id: string | null;
+            /** Due Day */
+            due_day: number | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /** Closed */
+            closed: boolean;
+            /** Carried From Id */
+            carried_from_id: string | null;
+            /** Notes */
+            notes: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "due" | "partial" | "paid" | "awaiting_income" | "needs_amount" | "tracking";
+            /** Due Amount */
+            due_amount: string | null;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining */
+            remaining: string | null;
+            /** Spent Amount */
+            spent_amount: string | null;
+            /** Left Amount */
+            left_amount: string | null;
+            /** Last Month Amount */
+            last_month_amount: string | null;
+            /** Payments */
+            payments: components["schemas"]["TransactionRead"][];
+        };
+        /**
+         * PlanSalary
+         * @description The salary the % items use: worked out from entries, unless set by hand.
+         */
+        PlanSalary: {
+            /** Auto */
+            auto: string;
+            /** Override */
+            override: string | null;
+            /** Effective */
+            effective: string;
+            /** Entries */
+            entries: components["schemas"]["SalaryEntry"][];
+        };
+        /** PlanUpdate */
+        PlanUpdate: {
+            /** Salary Override */
+            salary_override?: number | string | null;
+            /** Reviewed */
+            reviewed?: boolean | null;
+        };
         /** PreviousMonth */
         PreviousMonth: {
             /** Year */
@@ -1209,6 +1779,39 @@ export interface components {
             /** Display Name */
             display_name?: string | null;
         };
+        /**
+         * ReconcileBody
+         * @description The balance the bank (or wallet, or cash in hand) shows right now.
+         */
+        ReconcileBody: {
+            /** Balance */
+            balance: number | string;
+            /**
+             * As Spending
+             * @default true
+             */
+            as_spending: boolean;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ReconcileResult */
+        ReconcileResult: {
+            account: components["schemas"]["AccountRead"];
+            /** Transaction Id */
+            transaction_id?: string | null;
+            /** Difference */
+            difference: string;
+        };
+        /**
+         * RecoveryKeyResponse
+         * @description Shown once; only a hash is stored.
+         */
+        RecoveryKeyResponse: {
+            /** Recovery Key */
+            recovery_key: string;
+        };
         /** RegisterBody */
         RegisterBody: {
             /**
@@ -1220,6 +1823,28 @@ export interface components {
             password: string;
             /** Display Name */
             display_name?: string | null;
+        };
+        /** ResetPasswordBody */
+        ResetPasswordBody: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Recovery Key */
+            recovery_key: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** SalaryEntry */
+        SalaryEntry: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Amount */
+            amount: string;
         };
         /** SessionResponse */
         SessionResponse: {
@@ -1267,6 +1892,8 @@ export interface components {
             monthly_payment_id?: string | null;
             /** Period Month */
             period_month?: string | null;
+            /** Plan Item Id */
+            plan_item_id?: string | null;
         };
         /** TransactionRead */
         TransactionRead: {
@@ -1321,6 +1948,8 @@ export interface components {
             monthly_payment_id?: string | null;
             /** Period Month */
             period_month?: string | null;
+            /** Plan Item Id */
+            plan_item_id?: string | null;
         };
         /** TransactionUpdate */
         TransactionUpdate: {
@@ -1338,6 +1967,8 @@ export interface components {
             monthly_payment_id?: string | null;
             /** Period Month */
             period_month?: string | null;
+            /** Plan Item Id */
+            plan_item_id?: string | null;
         };
         /** TransferCreate */
         TransferCreate: {
@@ -1364,6 +1995,18 @@ export interface components {
             monthly_payment_id?: string | null;
             /** Period Month */
             period_month?: string | null;
+            /** Plan Item Id */
+            plan_item_id?: string | null;
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "sms" | "ai";
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Dest Source Ref */
+            dest_source_ref?: string | null;
         };
         /** TransferRead */
         TransferRead: {
@@ -1399,6 +2042,18 @@ export interface components {
             /** Credit Transaction Id */
             credit_transaction_id?: string | null;
         };
+        /** UnpaidLine */
+        UnpaidLine: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Name */
+            name: string;
+            /** Remaining */
+            remaining: string;
+        };
         /** UserPublic */
         UserPublic: {
             /** Id */
@@ -1414,6 +2069,11 @@ export interface components {
             display_name?: string | null;
             /** Household Id */
             household_id?: string | null;
+            /**
+             * Has Recovery Key
+             * @default false
+             */
+            has_recovery_key: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -1583,6 +2243,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserPublic"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_recovery_key_v1_auth_recovery_key_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryKeyResponse"];
+                };
+            };
+        };
+    };
+    reset_password_v1_auth_reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_v1_auth_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -2038,6 +2786,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconcile_account_v1_accounts__account_id__reconcile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconcileResult"];
                 };
             };
             /** @description Validation Error */
@@ -2575,6 +3358,293 @@ export interface operations {
             };
         };
     };
+    get_plan_v1_plans__year___month__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_plan_v1_plans__year___month__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_line_v1_plans__year___month__items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_line_v1_plans__year___month__items__item_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Stop it coming back next month too */
+                also_future?: boolean;
+            };
+            header?: never;
+            path: {
+                item_id: string;
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_line_v1_plans__year___month__items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_line_v1_plans__year___month__items__item_id__pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinePay"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_line_v1_plans__year___month__items__item_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineClose"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    carry_v1_plans__year___month__carry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+                month: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CarryBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     month_summary_v1_summary_month_get: {
         parameters: {
             query: {
@@ -2787,6 +3857,39 @@ export interface operations {
             };
         };
     };
+    report_client_error_v1_client_errors_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientErrorCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientErrorAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_users_v1_admin_users_get: {
         parameters: {
             query?: {
@@ -2840,6 +3943,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditEventRow_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recent_client_errors_v1_admin_client_errors_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientErrorRead"][];
                 };
             };
             /** @description Validation Error */
