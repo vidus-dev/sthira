@@ -243,6 +243,8 @@ export type PlanLine = {
   closed: boolean;
   carried_from_id: string | null;
   notes: string | null;
+  payee_upi: string | null;
+  payee_name: string | null;
   status: LineStatus;
   due_amount: Money | null;
   /** Bills: paid. Allowances: moved into the bucket. */
@@ -282,6 +284,8 @@ export type LineFields = {
   default_account_id?: string | null;
   due_day?: number | null;
   notes?: string | null;
+  payee_upi?: string | null;
+  payee_name?: string | null;
 };
 
 export type LineCreate = LineFields & { name: string; category_slug: string; repeat: boolean };

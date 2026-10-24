@@ -31,7 +31,13 @@ type Form = {
   destId: string | null;
   fromId: string | null;
   dueDay: string;
+  /** Paid to over UPI (bills paid out, not moved to a bucket). */
+  upi: string;
+  payeeName: string;
 };
+
+/** Same rule as the server: handle@provider. */
+export const UPI_ID = /^[a-z0-9._-]{2,64}@[a-z][a-z0-9.-]{1,32}$/;
 
 function formFrom(t: NonNullable<EditorTarget>): Form {
   const src = t.line ?? t.draft!;
@@ -48,6 +54,8 @@ function formFrom(t: NonNullable<EditorTarget>): Form {
     destId: src.dest_account_id ?? null,
     fromId: src.default_account_id ?? null,
     dueDay: src.due_day ? String(src.due_day) : "",
+    upi: src.payee_upi ?? "",
+    payeeName: src.payee_name ?? "",
   };
 }
 
@@ -89,6 +97,8 @@ export function LineEditor({ target, ym, onClose }: { target: EditorTarget; ym: 
     if (amountType === "fixed" && !amt) return "Enter the amount";
     if (amountType === "percent" && (!pct || pct <= 0 || pct > 100)) return "Enter a percent between 1 and 100";
     if (day !== null && (!Number.isInteger(day) || day < 1 || day > 31)) return "Due day is a date from 1 to 31";
+    const upi = form.destId ? "" : form.upi.trim().toLowerCase();
+    if (upi && !UPI_ID.test(upi)) return "Enter a UPI ID like name@okicici";
     return {
       name: form.name.trim(),
       kind: form.kind,
@@ -100,6 +110,8 @@ export function LineEditor({ target, ym, onClose }: { target: EditorTarget; ym: 
       dest_account_id: form.destId,
       default_account_id: form.fromId,
       due_day: day,
+      payee_upi: upi || null,
+      payee_name: upi ? form.payeeName.trim() || null : null,
     };
   }
 
@@ -262,6 +274,28 @@ export function LineEditor({ target, ym, onClose }: { target: EditorTarget; ym: 
                 ))}
             </View>
           </View>
+
+          {f.destId ? null : (
+            <View style={{ gap: 10 }}>
+              <TextField
+                label="Pay to UPI ID (optional)"
+                value={f.upi}
+                onChangeText={(t) => set({ upi: t.replace(/\s/g, "") })}
+                placeholder="e.g. 98xxxxxx@ybl"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                maxLength={100}
+              />
+              {f.upi.trim() ? (
+                <TextField label="Their name (optional)" value={f.payeeName} onChangeText={(t) => set({ payeeName: t })} placeholder="Shown in your UPI app" maxLength={80} />
+              ) : (
+                <Txt variant="caption" tone="faint">
+                  With a UPI ID, Pay opens your UPI app with the amount filled in.
+                </Txt>
+              )}
+            </View>
+          )}
 
           <TextField label="Due day (optional)" value={f.dueDay} onChangeText={(t) => set({ dueDay: t.replace(/[^0-9]/g, "") })} keyboardType="number-pad" placeholder="e.g. 5" maxLength={2} error={error} />
           <Button size="lg" icon="check" label={line ? "Save" : `Add to ${month}`} loading={action.isPending} onPress={save} />

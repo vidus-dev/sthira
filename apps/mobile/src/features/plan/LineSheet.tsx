@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
+import { Alert, Linking, ScrollView, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { useAccounts, useCategoryMap, usePlanAction } from "../../api/hooks";
@@ -21,6 +21,22 @@ import { Sheet } from "../../ui/Sheet";
 import { Txt } from "../../ui/Txt";
 import { accountIcon, accountLabel, categoryIcon } from "../shared";
 import { monthWord } from "./planText";
+
+/**
+ * A standard UPI payment link. Android shows the UPI apps that can open it (or the one set
+ * as default); the person approves with their PIN there. Nothing about the payment comes
+ * back, so Sthira asks afterwards whether it went through.
+ */
+function upiLink(upi: string, name: string | null, amount: number, note: string): string {
+  const q = [
+    `pa=${upi}`, // checked server-side: letters, digits, . _ - and @
+    `pn=${encodeURIComponent(name || upi.split("@")[0])}`,
+    `am=${amount.toFixed(2)}`,
+    "cu=INR",
+    `tn=${encodeURIComponent(note.slice(0, 50))}`,
+  ];
+  return `upi://pay?${q.join("&")}`;
+}
 
 type Props = { line: PlanLine | null; plan: MonthPlan | undefined; ym: YearMonth; onEdit: (line: PlanLine) => void; onClose: () => void };
 
@@ -44,9 +60,12 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
   const [paidOn, setPaidOn] = useState(new Date());
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set after handing off to a UPI app: the amount, to confirm when the person is back. */
+  const [awaiting, setAwaiting] = useState<string | null>(null);
 
   useEffect(() => {
     if (!incoming) return;
+    setAwaiting(null);
     setLineId(incoming.id);
     setFrozen(incoming);
     const left = toNumber(incoming.remaining ?? incoming.due_amount);
@@ -107,6 +126,17 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
     );
   }
 
+  function payWithUpi() {
+    if (!line?.payee_upi) return;
+    const decimal = keypadToDecimal(amount.trim());
+    if (!decimal) return setError("Enter the amount");
+    if (!fromId) return setError("Choose the account it's paid from");
+    setError(null);
+    Linking.openURL(upiLink(line.payee_upi, line.payee_name, toNumber(decimal), `${line.name} - ${month}`))
+      .then(() => setAwaiting(decimal))
+      .catch(() => setError("No UPI app on this phone could open it. Pay in your UPI app, then tap “Already paid”."));
+  }
+
   function toggleDone() {
     if (!line) return;
     action.mutate(() => api.monthPlan.close(ym.year, ym.month, line.id, !line.closed), { onError: failed });
@@ -133,6 +163,8 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
   const allowance = line.kind === "allowance";
   const spent = toNumber(line.spent_amount);
   const left = line.left_amount != null ? toNumber(line.left_amount) : null;
+  // Paying out to someone with a UPI ID (not moving money between own accounts).
+  const upi = !move && Boolean(line.payee_upi);
   const canAct = !line.closed && line.status !== "paid" && line.status !== "tracking" && line.status !== "needs_amount" && line.status !== "awaiting_income";
 
   return (
@@ -235,13 +267,41 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
                 </EdgeCard>
               ) : null}
             </View>
-            <Button
-              size="lg"
-              icon={move ? "swap" : "check"}
-              label={`${move && !toCard ? "Move" : "Pay"} ${keypadToDecimal(amount) ? formatINR(keypadToDecimal(amount)) : ""}`.trim()}
-              loading={action.isPending}
-              onPress={pay}
-            />
+            {upi && awaiting ? (
+              <EdgeCard radius={18} padding={16}>
+                <Txt variant="bodyMedium">
+                  Did {formatINR(awaiting)} to {line.payee_name || line.payee_upi} go through?
+                </Txt>
+                <Txt variant="caption" style={{ marginTop: 4, lineHeight: 18 }}>
+                  Sthira can't see inside your UPI app. If the bank's SMS comes later, Catch up knows it's already added.
+                </Txt>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 14 }}>
+                  <Button icon="check" label="Yes, record it" loading={action.isPending} onPress={pay} style={{ flex: 1 }} />
+                  <Button variant="outline" label="No" onPress={() => setAwaiting(null)} />
+                </View>
+              </EdgeCard>
+            ) : upi ? (
+              <View style={{ gap: 6 }}>
+                <Button
+                  size="lg"
+                  icon="arrowUpRight"
+                  label={keypadToDecimal(amount) ? `Pay ${formatINR(keypadToDecimal(amount))} with UPI` : "Pay with UPI"}
+                  onPress={payWithUpi}
+                />
+                <Txt variant="caption" tone="faint" style={{ textAlign: "center" }}>
+                  To {line.payee_name ? `${line.payee_name} · ` : ""}{line.payee_upi}
+                </Txt>
+                <Button variant="ghost" label="Already paid · just record it" loading={action.isPending} onPress={pay} />
+              </View>
+            ) : (
+              <Button
+                size="lg"
+                icon={move ? "swap" : "check"}
+                label={`${move && !toCard ? "Move" : "Pay"} ${keypadToDecimal(amount) ? formatINR(keypadToDecimal(amount)) : ""}`.trim()}
+                loading={action.isPending}
+                onPress={pay}
+              />
+            )}
           </View>
         ) : null}
 
