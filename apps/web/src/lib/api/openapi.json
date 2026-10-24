@@ -4600,6 +4600,30 @@
             ],
             "title": "Notes"
           },
+          "payee_upi": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Upi"
+          },
+          "payee_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Name"
+          },
           "repeat": {
             "type": "boolean",
             "title": "Repeat",
@@ -4833,6 +4857,30 @@
               }
             ],
             "title": "Notes"
+          },
+          "payee_upi": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Upi"
+          },
+          "payee_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Name"
           },
           "scope": {
             "type": "string",
@@ -6028,6 +6076,28 @@
             ],
             "title": "Notes"
           },
+          "payee_upi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Upi"
+          },
+          "payee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Name"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -6133,6 +6203,8 @@
           "closed",
           "carried_from_id",
           "notes",
+          "payee_upi",
+          "payee_name",
           "status",
           "due_amount",
           "paid_amount",

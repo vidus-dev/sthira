@@ -1412,6 +1412,10 @@ export interface components {
             due_day?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Payee Upi */
+            payee_upi?: string | null;
+            /** Payee Name */
+            payee_name?: string | null;
             /**
              * Repeat
              * @default true
@@ -1455,6 +1459,10 @@ export interface components {
             due_day?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Payee Upi */
+            payee_upi?: string | null;
+            /** Payee Name */
+            payee_name?: string | null;
             /**
              * Scope
              * @default month
@@ -1796,6 +1804,10 @@ export interface components {
             carried_from_id: string | null;
             /** Notes */
             notes: string | null;
+            /** Payee Upi */
+            payee_upi: string | null;
+            /** Payee Name */
+            payee_name: string | null;
             /**
              * Status
              * @enum {string}
