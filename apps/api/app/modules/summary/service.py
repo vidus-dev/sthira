@@ -1,23 +1,32 @@
-"""Month summary: totals, by category, by day, by member, and last month's pace."""
+"""Month summary (totals, by category, by day, by member, last month's pace), the total
+balance day by day, and month-by-month savings."""
 
 import calendar
-from datetime import UTC, date, datetime
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.actor import Actor
+from app.models.account import FinancialAccount
 from app.models.household import Household
 from app.models.transaction import LedgerTransaction
 from app.modules.households.defaults import ADJUSTMENT_SLUG
-from app.modules.periods import add_months, local_date, month_bounds
+from app.modules.month_plans.linking import SALARY_SLUG, salary_window
+from app.modules.periods import add_months, local_date, month_bounds, month_start
 from app.modules.summary.schemas import (
+    BalanceHistory,
+    BalancePoint,
     CategoryTotal,
     DayTotal,
     MemberTotal,
+    MonthSavings,
     MonthSummary,
     PreviousMonth,
+    SavingsHistory,
 )
 
 ZERO = Decimal("0")
@@ -123,3 +132,121 @@ class SummaryService:
                 ),
             ),
         )
+
+    async def balance_history(self, actor: Actor, days: int) -> BalanceHistory:
+        """Rebuilt backwards from today's balances: the end of day D is today's balance
+        minus every entry dated after D. Transfers net out across accounts; balance
+        corrections count (they moved the balance). An account adds nothing before the
+        day it was added, since its opening balance already holds what came before."""
+        household = await self._session.get(Household, actor.household_id)
+        assert household is not None
+        tz = household.timezone
+        today = local_date(datetime.now(UTC), tz)
+
+        accounts = (
+            await self._session.execute(
+                select(
+                    FinancialAccount.id, FinancialAccount.balance, FinancialAccount.created_at
+                ).where(FinancialAccount.household_id == actor.household_id)
+            )
+        ).all()
+        if not accounts:
+            return BalanceHistory(points=[])
+        opened = {acc_id: local_date(created, tz) for acc_id, _, created in accounts}
+        balance = {acc_id: Decimal(bal) for acc_id, bal, _ in accounts}
+        first = min(today, max(today - timedelta(days=days - 1), min(opened.values())))
+
+        local_day = func.date(func.timezone(tz, LedgerTransaction.occurred_at))
+        rows = await self._session.execute(
+            select(LedgerTransaction.account_id, local_day, func.sum(LedgerTransaction.amount))
+            .where(
+                LedgerTransaction.household_id == actor.household_id,
+                LedgerTransaction.deleted_at.is_(None),
+                local_day > first,
+            )
+            .group_by(LedgerTransaction.account_id, local_day)
+        )
+        on_day: dict[date, dict[UUID, Decimal]] = defaultdict(dict)
+        after: dict[UUID, Decimal] = defaultdict(lambda: ZERO)
+        for acc_id, day, total in rows.all():
+            if day > today:  # dated in the future: not in any end-of-day yet
+                after[acc_id] += total
+            else:
+                on_day[day][acc_id] = total
+
+        points: list[BalancePoint] = []
+        day = today
+        while day >= first:
+            total = sum((balance[a] - after[a] for a in balance if opened[a] <= day), ZERO)
+            points.append(BalancePoint(day=day, total=total))
+            for acc_id, amount in on_day.get(day, {}).items():
+                after[acc_id] += amount
+            day -= timedelta(days=1)
+        points.reverse()
+        return BalanceHistory(points=points)
+
+    async def savings(self, actor: Actor, count: int) -> SavingsHistory:
+        """Income, spending and what was kept, per month. Salary follows the plan's window
+        (salary on 30 Sep counts for October), so a month doesn't look empty just because
+        the salary landed a day early. Months before the first entry are left out."""
+        household = await self._session.get(Household, actor.household_id)
+        assert household is not None
+        tz = household.timezone
+        current = month_start(local_date(datetime.now(UTC), tz))
+        months = [add_months(current, -i) for i in range(count - 1, -1, -1)]
+        start, _ = month_bounds(months[0].year, months[0].month, tz)
+        _, end = month_bounds(current.year, current.month, tz)
+
+        local_month = func.date_trunc("month", func.timezone(tz, LedgerTransaction.occurred_at))
+        not_salary = (LedgerTransaction.amount > 0) & (
+            LedgerTransaction.category_slug != SALARY_SLUG
+        )
+        rows = await self._session.execute(
+            select(
+                local_month,
+                func.coalesce(
+                    func.sum(case((LedgerTransaction.amount < 0, -LedgerTransaction.amount))), ZERO
+                ),
+                func.coalesce(func.sum(case((not_salary, LedgerTransaction.amount))), ZERO),
+            )
+            .where(*self._scope(actor, start, end))
+            .group_by(local_month)
+        )
+        expense: dict[date, Decimal] = {}
+        other_income: dict[date, Decimal] = {}
+        for m, spent, received in rows.all():
+            expense[m.date()] = spent
+            other_income[m.date()] = received
+
+        windows = [(m, *salary_window(m, tz)) for m in months]
+        salary_rows = await self._session.execute(
+            select(LedgerTransaction.occurred_at, LedgerTransaction.amount).where(
+                *self._scope(actor, windows[0][1], windows[-1][2]),
+                LedgerTransaction.amount > 0,
+                LedgerTransaction.category_slug == SALARY_SLUG,
+            )
+        )
+        salary: dict[date, Decimal] = defaultdict(lambda: ZERO)
+        for occurred_at, amount in salary_rows.all():
+            for m, w_start, w_end in windows:
+                if w_start <= occurred_at < w_end:
+                    salary[m] += amount
+                    break
+
+        out: list[MonthSavings] = []
+        for m in months:
+            spent = expense.get(m, ZERO)
+            income = salary[m] + other_income.get(m, ZERO)
+            if not out and not spent and not income and m != current:
+                continue  # before the first entry
+            out.append(
+                MonthSavings(
+                    year=m.year,
+                    month=m.month,
+                    income=income,
+                    salary=salary[m],
+                    expense=spent,
+                    net=income - spent,
+                )
+            )
+        return SavingsHistory(months=out)

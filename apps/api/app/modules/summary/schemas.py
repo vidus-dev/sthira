@@ -47,3 +47,33 @@ class MonthSummary(BaseModel):
     by_day: list[DayTotal]
     by_member: list[MemberTotal]
     previous: PreviousMonth
+
+
+class BalancePoint(BaseModel):
+    day: date
+    # Sum of every account's balance at the end of that local day (cards negative).
+    total: Decimal
+
+
+class BalanceHistory(BaseModel):
+    """End-of-day totals, oldest first; the last point is today and equals the live total.
+    Starts on the day the first account was added (or ``days`` back, if later)."""
+
+    points: list[BalancePoint]
+
+
+class MonthSavings(BaseModel):
+    year: int
+    month: int
+    # Salary that counts for this month (the plan's window: salary on the last day of the
+    # month before counts here) plus other income received in the month.
+    income: Decimal
+    salary: Decimal
+    expense: Decimal
+    net: Decimal
+
+
+class SavingsHistory(BaseModel):
+    """Oldest first, ending with the current month (still in progress)."""
+
+    months: list[MonthSavings]
