@@ -2369,6 +2369,98 @@
         }
       }
     },
+    "/v1/summary/balance-history": {
+      "get": {
+        "tags": [
+          "summary"
+        ],
+        "summary": "Balance History",
+        "description": "Total balance at the end of each day, for the line under Home's total.",
+        "operationId": "balance_history_v1_summary_balance_history_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 400,
+              "minimum": 2,
+              "default": 90,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/summary/savings": {
+      "get": {
+        "tags": [
+          "summary"
+        ],
+        "summary": "Savings",
+        "description": "Income, spending and what was kept, month by month (ending with this month).",
+        "operationId": "savings_v1_summary_savings_get",
+        "parameters": [
+          {
+            "name": "months",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 36,
+              "minimum": 1,
+              "default": 12,
+              "title": "Months"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavingsHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/export/transactions.csv": {
       "get": {
         "tags": [
@@ -3281,6 +3373,43 @@
           "created_at"
         ],
         "title": "AuditEventRow"
+      },
+      "BalanceHistory": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points"
+        ],
+        "title": "BalanceHistory",
+        "description": "End-of-day totals, oldest first; the last point is today and equals the live total.\nStarts on the day the first account was added (or ``days`` back, if later)."
+      },
+      "BalancePoint": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "total"
+        ],
+        "title": "BalancePoint"
       },
       "BucketCheck": {
         "properties": {
@@ -4853,6 +4982,48 @@
         ],
         "title": "MonthPlanRead"
       },
+      "MonthSavings": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "income": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Income"
+          },
+          "salary": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Salary"
+          },
+          "expense": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Expense"
+          },
+          "net": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Net"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "income",
+          "salary",
+          "expense",
+          "net"
+        ],
+        "title": "MonthSavings"
+      },
       "MonthSummary": {
         "properties": {
           "year": {
@@ -6271,6 +6442,23 @@
           "amount"
         ],
         "title": "SalaryEntry"
+      },
+      "SavingsHistory": {
+        "properties": {
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/MonthSavings"
+            },
+            "type": "array",
+            "title": "Months"
+          }
+        },
+        "type": "object",
+        "required": [
+          "months"
+        ],
+        "title": "SavingsHistory",
+        "description": "Oldest first, ending with the current month (still in progress)."
       },
       "SessionResponse": {
         "properties": {

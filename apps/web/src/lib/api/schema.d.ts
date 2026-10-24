@@ -642,6 +642,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/summary/balance-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Balance History
+         * @description Total balance at the end of each day, for the line under Home's total.
+         */
+        get: operations["balance_history_v1_summary_balance_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/summary/savings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Savings
+         * @description Income, spending and what was kept, month by month (ending with this month).
+         */
+        get: operations["savings_v1_summary_savings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/export/transactions.csv": {
         parameters: {
             query?: never;
@@ -936,6 +976,25 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * BalanceHistory
+         * @description End-of-day totals, oldest first; the last point is today and equals the live total.
+         *     Starts on the day the first account was added (or ``days`` back, if later).
+         */
+        BalanceHistory: {
+            /** Points */
+            points: components["schemas"]["BalancePoint"][];
+        };
+        /** BalancePoint */
+        BalancePoint: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Total */
+            total: string;
         };
         /**
          * BucketCheck
@@ -1453,6 +1512,21 @@ export interface components {
             /** Previous Unpaid */
             previous_unpaid: components["schemas"]["UnpaidLine"][];
         };
+        /** MonthSavings */
+        MonthSavings: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Income */
+            income: string;
+            /** Salary */
+            salary: string;
+            /** Expense */
+            expense: string;
+            /** Net */
+            net: string;
+        };
         /**
          * MonthSummary
          * @description Expenses and income exclude transfers between our own accounts.
@@ -1845,6 +1919,14 @@ export interface components {
             date: string;
             /** Amount */
             amount: string;
+        };
+        /**
+         * SavingsHistory
+         * @description Oldest first, ending with the current month (still in progress).
+         */
+        SavingsHistory: {
+            /** Months */
+            months: components["schemas"]["MonthSavings"][];
         };
         /** SessionResponse */
         SessionResponse: {
@@ -3664,6 +3746,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonthSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    balance_history_v1_summary_balance_history_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    savings_v1_summary_savings_get: {
+        parameters: {
+            query?: {
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavingsHistory"];
                 };
             };
             /** @description Validation Error */
