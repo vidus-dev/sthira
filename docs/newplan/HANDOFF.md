@@ -42,6 +42,9 @@ exact next steps. The other files in this folder go deeper on specific topics:
 - **Also 11 Oct — month-by-month plan** (same branch): each month its own plan, rules for
   what carries over, bills vs allowances, bucket accounts, auto-ticking. §12
   "Month-by-month plan".
+- **24 Oct — over-the-air update:** pinned Catch up / Check balances buttons, bank vs Sthira
+  on Accounts, balance line on Home, Savings in Insights, card bills from SMS in Plan
+  (+ 2 read-only API endpoints). §12 "Over-the-air update, 24 Oct 2026".
 
 ---
 
@@ -694,6 +697,48 @@ mobile tsc clean; browser preview walkthrough with the demo account (plan ready 
 fill an amount, edit sheet, Done, add Groceries as an allowance → move ₹5,000 to the
 bucket → "₹3,760 left", bucket "covered"). Ships with the server update; as an OTA on
 the 1.1.0 runtime (no extra APK).
+
+### Over-the-air update, 24 Oct 2026 (same 1.1.0 runtime, no new APK)
+Why: the owner saw bank SMS in Catch up but balances didn't move. They hadn't found
+the "Add N entries" button because it sat below the whole list. They then picked four
+parked/new ideas to ship over the air.
+- **Catch up / Check balances:** the main button is pinned at the bottom (fades over
+  the list like the tab bar). Catch up adds Tick all / Untick all and "N ticked need an
+  account".
+- **Bank vs Sthira** (`features/sms/bankCheck.ts`): the newest SMS "Avl bal" per account
+  is now **kept between scans** (AsyncStorage `sthira.sms.balances.<user>`), compared
+  with Sthira's balance *at the SMS time* (today's balance − entries after it). Accounts
+  shows "Matches the bank SMS" or "Bank SMS …: ₹X more/less than Sthira" with **Fix**
+  (opens Check balances prefilled via route param `fill`) or "N SMS waiting". Hidden
+  while the outbox has unsynced entries. Check balances' "use" hint uses the same value.
+- **Balance line on Home:** `GET /v1/summary/balance-history?days=90` (one point per
+  local day, rebuilt backwards from current balances; accounts count from their
+  `created_at` day; deleted entries excluded; corrections included). Thin sparkline
+  under the total + "↗ ₹X since <day>" ("No change" when flat); the last point is replaced
+  by the Home total so they always agree. Tap → Accounts.
+- **Savings in Insights:** `GET /v1/summary/savings?months=12`: per month income
+  (salary by the plan's window, so salary on the 30th counts for the next month, plus
+  other income in the calendar month), expense, net; leading empty months dropped.
+  This differs from the Income card (calendar month), and the card says so.
+- **Card bills from SMS:** `parseCardBill` (statements and "is due" reminders: total, min,
+  due date, last digits). The scan reads 45 days back the first time
+  (`sthira.sms.billsSince.<user>`) and keeps bills until 60 days past due
+  (`sthira.sms.cardBills.<user>`). Plan shows "CARD BILLS FROM SMS" for bills due in that
+  month whose card isn't already a line's destination. **Add** creates a one-off bill
+  (`category_slug: "transfer"`, `dest_account_id` = the card), so paying it is a transfer
+  to the card, and card payments confirmed from SMS settle it through the bucket pool.
+  **Skip** is remembered per user. The pay sheet for a card line offers only "Pay"
+  (no "Paid out").
+
+Verified: API 182 tests pass (89%), ruff clean; `tests/integration/test_balance_history_and_savings.py`
+(day-by-day totals incl. transfer/deleted/opened-later, salary window, HTTP);
+mobile tsc clean; `test:sms` 33 cases (10 new card-bill cases); browser preview
+screenshots of Home (line with test entries), Insights savings, Accounts, Check
+balances bar. **Not verified on a device:** the SMS-based parts (bank line, card bills).
+
+Released: API deployed via `phase-1-onyx` (fast-forwarded to `phase-2-catchup`, both at
+`a7ad257`); OTA on channel `preview`, runtime 1.1.0, update group
+`580e56d4-3ef7-4598-95f4-5b37ecd1c16f` (bundle checked to use the Render URL).
 
 ### Phase 5 — real use
 Owner adds real accounts with today's balances, salary, monthly plan (templates), and
