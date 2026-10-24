@@ -70,6 +70,9 @@ class MonthlyPayment(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Paid to over UPI ("name@okicici"), so Pay can open the UPI app with it filled in.
+    payee_upi: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    payee_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

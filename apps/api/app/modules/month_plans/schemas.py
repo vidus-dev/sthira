@@ -1,12 +1,16 @@
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.modules.monthly_payments.schemas import AmountType, ItemKind
 from app.modules.transactions.schemas import TransactionRead
+
+# handle@provider: letters, digits, dot, dash, underscore; the provider starts with a letter.
+UPI_ID = re.compile(r"[a-z0-9._\-]{2,64}@[a-z][a-z0-9.\-]{1,32}")
 
 # due / partly paid / paid (or set aside) / % item waiting for salary / amount not entered
 # yet / an allowance with nothing to do but watch what's left.
@@ -47,6 +51,8 @@ class PlanLine(BaseModel):
     closed: bool
     carried_from_id: UUID | None
     notes: str | None
+    payee_upi: str | None
+    payee_name: str | None
 
     status: LineStatus
     due_amount: Decimal | None
@@ -111,6 +117,24 @@ class LineFields(BaseModel):
     default_account_id: UUID | None = None
     due_day: int | None = Field(default=None, ge=1, le=31)
     notes: str | None = Field(default=None, max_length=2000)
+    # A UPI ID ("name@okicici", "98xxxxxx@ybl"); empty clears it.
+    payee_upi: str | None = Field(default=None, max_length=100)
+    payee_name: str | None = Field(default=None, max_length=80)
+
+    @field_validator("payee_upi")
+    @classmethod
+    def _upi_id(cls, v: str | None) -> str | None:
+        v = (v or "").strip().lower()
+        if not v:
+            return None
+        if not UPI_ID.fullmatch(v):
+            raise ValueError("Enter a UPI ID like name@okicici")
+        return v
+
+    @field_validator("payee_name")
+    @classmethod
+    def _blank_name(cls, v: str | None) -> str | None:
+        return (v or "").strip() or None
 
 
 class LineCreate(LineFields):

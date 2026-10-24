@@ -62,6 +62,8 @@ _SHARED = (
     "default_account_id",
     "due_day",
     "notes",
+    "payee_upi",
+    "payee_name",
 )
 
 
@@ -156,6 +158,8 @@ class MonthPlanService:
             due_day=t.due_day,
             sort_order=order,
             notes=t.notes,
+            payee_upi=t.payee_upi,
+            payee_name=t.payee_name,
         )
 
     async def _link_existing(
@@ -300,6 +304,8 @@ class MonthPlanService:
                     closed=line.closed,
                     carried_from_id=line.carried_from_id,
                     notes=line.notes,
+                    payee_upi=line.payee_upi,
+                    payee_name=line.payee_name,
                     status=status,
                     due_amount=due,
                     paid_amount=paid,
@@ -586,6 +592,8 @@ class MonthPlanService:
             due_day=line.due_day,
             sort_order=line.sort_order,
             notes=line.notes,
+            payee_upi=line.payee_upi,
+            payee_name=line.payee_name,
         )
 
     async def add_line(self, actor: Actor, year: int, month: int, body: LineCreate) -> MonthPlanRead:
@@ -781,6 +789,8 @@ class MonthPlanService:
                     due_day=plan.month.day,
                     sort_order=-1,
                     carried_from_id=old.id,
+                    payee_upi=old.payee_upi,
+                    payee_name=old.payee_name,
                 )
             )
         old.updated_at = datetime.now(UTC)

@@ -318,3 +318,38 @@ def test_plans_over_http_and_undo_auto_link() -> None:
         assert gone.json()["items"] == []
         nxt = client.get(f"/v1/plans/{NEXT.year}/{NEXT.month}").json()
         assert nxt["items"] == []
+
+
+def test_payee_upi_follows_the_item_into_later_months() -> None:
+    async def scenario() -> None:
+        sm = make_sessionmaker()
+        actor = await create_actor(sm)
+        async with sm() as s:
+            await MonthPlanService(s).get(actor, THIS.year, THIS.month)
+        async with sm() as s:
+            plan = await MonthPlanService(s).add_line(
+                actor, THIS.year, THIS.month,
+                LineCreate(name="Donations", category_slug="donations", amount=Decimal("5500"),
+                           payee_upi="  Amma.K@OKICICI ", payee_name=" Amma "),
+            )
+        line = next(i for i in plan.items if i.name == "Donations")
+        assert (line.payee_upi, line.payee_name) == ("amma.k@okicici", "Amma")
+
+        async with sm() as s:
+            nxt = await MonthPlanService(s).get(actor, NEXT.year, NEXT.month)
+        copied = next(i for i in nxt.items if i.name == "Donations")
+        assert copied.payee_upi == "amma.k@okicici"
+
+        # Changed "from now on" reaches next month too; empty clears it.
+        async with sm() as s:
+            await MonthPlanService(s).update_line(
+                actor, THIS.year, THIS.month, line.id, LineUpdate(payee_upi="", scope="future"),
+            )
+        async with sm() as s:
+            nxt = await MonthPlanService(s).get(actor, NEXT.year, NEXT.month)
+        assert next(i for i in nxt.items if i.name == "Donations").payee_upi is None
+
+        with pytest.raises(ValueError):
+            LineUpdate(payee_upi="9876543210")  # a phone number alone isn't a UPI ID
+
+    run(scenario())

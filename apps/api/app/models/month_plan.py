@@ -100,6 +100,9 @@ class MonthPlanItem(Base):
     carried_from_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("month_plan_items.id", ondelete="SET NULL"), nullable=True
     )
+    # Paid to over UPI ("name@okicici"), so Pay can open the UPI app with it filled in.
+    payee_upi: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    payee_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
