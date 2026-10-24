@@ -740,6 +740,22 @@ Released: API deployed via `phase-1-onyx` (fast-forwarded to `phase-2-catchup`, 
 `a7ad257`); OTA on channel `preview`, runtime 1.1.0, update group
 `580e56d4-3ef7-4598-95f4-5b37ecd1c16f` (bundle checked to use the Render URL).
 
+### Pay plan items with UPI, 24 Oct 2026 (OTA + migration 0008)
+- Migration `0008_plan_payee`: `payee_upi` (≤100) and `payee_name` (≤80) on
+  `monthly_payments` and `month_plan_items`; copied rule → month line, on carry, and with
+  "from now on" edits (`_SHARED`). `LineFields` validates the UPI ID (lower-cased,
+  `handle@provider`; empty clears it).
+- App: the line editor has "Pay to UPI ID" + name (only when the money isn't moved to a
+  bucket). The pay sheet then shows **Pay ₹X with UPI**: it opens a `upi://pay?pa=…&pn=…&am=…&cu=INR&tn=<item - month>`
+  link with `Linking.openURL`. Android shows the installed UPI apps, or opens the one set as
+  default. Back in Sthira: "Did ₹X to <name> go through?" → **Yes, record it** (the normal
+  plan pay call) or No. "Already paid · just record it" stays available.
+- Limits: no payment result comes back (that would need a native module and a new APK),
+  and some UPI apps (notably GPay) may refuse person-to-person payments started from
+  another app. The later bank SMS is flagged "Already added?" by Catch up's duplicate check.
+- Next APK idea: an in-app picker (PhonePe / GPay / Paytm / BHIM…) opening the chosen app
+  directly and reading its result (`startActivityForResult`), so no "did it go through?".
+
 ### Phase 5 — real use
 Owner adds real accounts with today's balances, salary, monthly plan (templates), and
 runs it next to the notebook for a few weeks. Collect feedback.
