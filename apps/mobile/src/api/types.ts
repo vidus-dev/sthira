@@ -184,6 +184,13 @@ export type PayInput = {
 export type CategoryTotal = { slug: string; total: Money; count: number };
 export type DayTotal = { day: string; expense: Money; income: Money };
 
+/** End-of-day total of all accounts (cards negative), oldest first; the last point is today. */
+export type BalanceHistory = { points: { day: string; total: Money }[] };
+
+/** Salary follows the plan's window (salary on the last day of a month counts for the next). */
+export type MonthSavings = { year: number; month: number; income: Money; salary: Money; expense: Money; net: Money };
+export type SavingsHistory = { months: MonthSavings[] };
+
 export type MonthSummary = {
   year: number;
   month: number;

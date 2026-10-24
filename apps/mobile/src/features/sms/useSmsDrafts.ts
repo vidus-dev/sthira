@@ -11,14 +11,33 @@ import { api } from "../../api/client";
 import { useAccounts, useCategories } from "../../api/hooks";
 import { enqueue, pendingRefs } from "../../api/outbox";
 import { useAuth } from "../../auth/AuthContext";
-import { buildDrafts, latestBalances, type Draft } from "./drafts";
+import type { Account } from "../../api/types";
+import { buildDrafts, latestBalances, matchAccount, type Draft } from "./drafts";
+import { parseCardBill, smsRef, type CardBill } from "./parser";
 
 const DAY = 24 * 60 * 60 * 1000;
 /** On the very first scan, look back this far (never before the accounts were added). */
 const FIRST_LOOKBACK = 30 * DAY;
+/** Card statements arrive ~3 weeks before the due date; look back this far the first time. */
+const BILL_LOOKBACK = 45 * DAY;
 
 const sinceKey = (userId: string) => `sthira.sms.since.${userId}`;
 const skippedKey = (userId: string) => `sthira.sms.skipped.${userId}`;
+const billsSinceKey = (userId: string) => `sthira.sms.billsSince.${userId}`;
+const billsKey = (userId: string) => `sthira.sms.cardBills.${userId}`;
+const balancesKey = (userId: string) => `sthira.sms.balances.${userId}`;
+
+type Balances = Record<string, { balance: number; date: number }>;
+type StoredBill = CardBill & { ref: string; date: number };
+export type SmsCardBill = StoredBill & { accountId: string | null };
+
+/** One statement can come with reminders; they share the card and the due date. */
+const billKey = (b: CardBill) => `${b.last4 ?? b.bank ?? "card"}|${b.dueDate}`;
+
+function matchCard(b: CardBill, accounts: Account[]): string | null {
+  const cards = accounts.filter((a) => a.account_type === "credit");
+  return matchAccount({ amount: b.total, direction: "debit", last4: b.last4, card: true, merchant: null, balance: null, bank: b.bank }, cards);
+}
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -31,8 +50,10 @@ async function readJson<T>(key: string, fallback: T): Promise<T> {
 
 export type SmsScan = {
   drafts: Draft[];
-  /** Newest "Avl bal" the bank sent per account (a hint for balance checks). */
-  balances: Record<string, { balance: number; date: number }>;
+  /** Newest "Avl bal" the bank sent per account (kept between scans). */
+  balances: Balances;
+  /** Credit card statements / due reminders, newest message per card and due date. */
+  cardBills: SmsCardBill[];
   scannedFrom: number;
 };
 
@@ -67,13 +88,42 @@ export function useSmsDrafts() {
       const firstAccount = Math.min(...accs.map((a) => Date.parse(a.created_at)), Date.now());
       const stored = await readJson<number | null>(sinceKey(userId), null);
       const since = stored ?? Math.max(Date.now() - FIRST_LOOKBACK, firstAccount - DAY);
+      const billsSince = (await readJson<number | null>(billsSinceKey(userId), null)) ?? Date.now() - BILL_LOOKBACK;
 
-      const [messages, existing, history, skipped] = await Promise.all([
-        readBankSms(since, 1500),
+      const [all, existing, history, skipped, savedBills, savedBalances] = await Promise.all([
+        readBankSms(Math.min(since, billsSince), 1500),
         api.transactions.list({ start: new Date(since - 2 * DAY).toISOString(), limit: 2000 }),
         api.transactions.list({ start: new Date(Date.now() - 120 * DAY).toISOString(), limit: 2000 }),
         readJson<string[]>(skippedKey(userId), []),
+        readJson<StoredBill[]>(billsKey(userId), []),
+        readJson<Balances>(balancesKey(userId), {}),
       ]);
+      const messages = all.filter((m) => m.date >= since);
+
+      // Card bills: keep the newest message per card and due date, until 60 days past due.
+      const bills = new Map(savedBills.map((b) => [billKey(b), b]));
+      for (const m of all) {
+        if (m.date < billsSince) continue;
+        const bill = parseCardBill(m.address, m.body);
+        if (!bill) continue;
+        const prev = bills.get(billKey(bill));
+        if (!prev || prev.date < m.date) bills.set(billKey(bill), { ...bill, ref: smsRef(m.address, m.body, m.date), date: m.date });
+      }
+      const keptBills = [...bills.values()].filter((b) => Date.parse(b.dueDate) > Date.now() - 60 * DAY);
+
+      // Bank-reported balances: the newest per account, from this scan or an earlier one.
+      const balances: Balances = {};
+      const fresh = Object.fromEntries(latestBalances(all, accs));
+      for (const a of accs) {
+        const pick = [savedBalances[a.id], fresh[a.id]].filter(Boolean).sort((x, y) => y!.date - x!.date)[0];
+        if (pick) balances[a.id] = pick;
+      }
+      await Promise.all([
+        AsyncStorage.setItem(billsKey(userId), JSON.stringify(keptBills)),
+        AsyncStorage.setItem(billsSinceKey(userId), JSON.stringify(Date.now() - DAY)),
+        AsyncStorage.setItem(balancesKey(userId), JSON.stringify(balances)),
+      ]).catch(() => {});
+
       const drafts = buildDrafts({
         messages,
         accounts: accs,
@@ -88,7 +138,12 @@ export function useSmsDrafts() {
       const oldestOpen = drafts.length ? Math.min(...drafts.map((d) => d.date)) - 60_000 : Date.now() - 2 * DAY;
       await AsyncStorage.setItem(sinceKey(userId), JSON.stringify(Math.max(since, Math.min(oldestOpen, Date.now() - 2 * DAY)))).catch(() => {});
 
-      return { drafts, balances: Object.fromEntries(latestBalances(messages, accs)), scannedFrom: since };
+      return {
+        drafts,
+        balances,
+        cardBills: keptBills.map((b) => ({ ...b, accountId: matchCard(b, accs) })).sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+        scannedFrom: since,
+      };
     },
   });
 }

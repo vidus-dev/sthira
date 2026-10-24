@@ -52,7 +52,8 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
     const left = toNumber(incoming.remaining ?? incoming.due_amount);
     setAmount(left > 0 ? String(left).replace(/\.0+$/, "") : "");
     setFill("");
-    setFromId(incoming.default_account_id ?? accounts.find((a) => a.is_default)?.id ?? accounts.find((a) => a.id !== incoming.dest_account_id)?.id ?? null);
+    const notDest = accounts.filter((a) => a.id !== incoming.dest_account_id);
+    setFromId(incoming.default_account_id ?? notDest.find((a) => a.is_default)?.id ?? notDest.find((a) => a.account_type !== "credit")?.id ?? notDest[0]?.id ?? null);
     setMove(Boolean(incoming.dest_account_id));
     setPaidOn(new Date());
     setPicking(false);
@@ -66,6 +67,8 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
 
   const month = monthWord(ym.year, ym.month);
   const dest = accounts.find((a) => a.id === line?.dest_account_id);
+  // A card bill is always paid by moving money to the card (spending was counted at the swipe).
+  const toCard = dest?.account_type === "credit";
   const byId = new Map(accounts.map((a) => [a.id, a]));
 
   function failed(e: unknown) {
@@ -165,7 +168,13 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
             </Txt>
             {dest ? (
               <Txt variant="caption" tone={allowance && due && paid >= due ? "positive" : "muted"} tabular>
-                {paid > 0 ? `${formatINR(paid)} moved to ${dest.display_name}` : `Goes to ${dest.display_name}`}
+                {toCard
+                  ? paid > 0
+                    ? `${formatINR(paid)} paid to ${dest.display_name}`
+                    : `Paid to ${dest.display_name} from a bank account`
+                  : paid > 0
+                    ? `${formatINR(paid)} moved to ${dest.display_name}`
+                    : `Goes to ${dest.display_name}`}
               </Txt>
             ) : null}
           </View>
@@ -189,7 +198,7 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
         {canAct ? (
           <View style={{ gap: 16 }}>
             <TextField label="Amount (₹)" value={amount} onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ""))} keyboardType="decimal-pad" placeholder="0" error={error} />
-            {dest ? (
+            {dest && !toCard ? (
               <Segmented<"move" | "pay">
                 value={move ? "move" : "pay"}
                 onChange={(v) => setMove(v === "move")}
@@ -229,7 +238,7 @@ export function LineSheet({ line: incoming, plan, ym, onEdit, onClose }: Props) 
             <Button
               size="lg"
               icon={move ? "swap" : "check"}
-              label={`${move ? "Move" : "Pay"} ${keypadToDecimal(amount) ? formatINR(keypadToDecimal(amount)) : ""}`.trim()}
+              label={`${move && !toCard ? "Move" : "Pay"} ${keypadToDecimal(amount) ? formatINR(keypadToDecimal(amount)) : ""}`.trim()}
               loading={action.isPending}
               onPress={pay}
             />

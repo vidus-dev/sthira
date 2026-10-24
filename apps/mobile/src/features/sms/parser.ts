@@ -186,6 +186,72 @@ export function parseBankSms(address: string, body: string): ParsedSms | null {
   };
 }
 
+export type CardBill = {
+  bank: string | null;
+  last4: string | null;
+  /** Total amount due on the statement. */
+  total: number;
+  minDue: number | null;
+  /** Local date, "YYYY-MM-DD". */
+  dueDate: string;
+};
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONEY = String.raw`(?:rs\.?|inr|₹)?\s*:?\s*([\d,]+(?:\.\d{1,2})?)`;
+const TOTAL_DUE = new RegExp(String.raw`\b(?:total|tot\.?)\s*(?:amt\.?|amount)?\s*(?:due|payable)\s*(?:is|of|:|-)?\s*${MONEY}`, "i");
+const PAYMENT_DUE = new RegExp(String.raw`\bpayment of\s*${MONEY}\s*(?:is|was)?\s*(?:over)?due`, "i");
+const MIN_DUE = new RegExp(String.raw`\bmin(?:imum)?\.?\s*(?:amt\.?|amount)?\s*due\s*(?:is|of|:|-)?\s*${MONEY}`, "i");
+const DUE_DATE_AT = /\b(?:payment due date|due date|due on|due by|pay by|payable by|is due|on or before|by)\s*(?:is|:|-|of)?\s*(?:on\s+)?/gi;
+const BILL_PAID = /\b(?:received|credited|thank you for (?:your |the )?payment|has been paid|payment successful|autopay (?:is )?(?:set|registered|scheduled))\b/i;
+
+/** "05-11-26", "5/11/2026", "05-Nov-26", "5 November 2026", "2026-11-05" → "2026-11-05". */
+function parseDate(s: string): string | null {
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  let y: number, m: number, d: number;
+  if (iso) {
+    [y, m, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  } else {
+    const r = /^(\d{1,2})(?:st|nd|rd|th)?[-/ .]+(\d{1,2}|[a-z]{3,9})[-/ .,]+(\d{2,4})\b/i.exec(s);
+    if (!r) return null;
+    d = Number(r[1]);
+    m = /^\d+$/.test(r[2]) ? Number(r[2]) : MONTHS.indexOf(r[2].slice(0, 3).toLowerCase()) + 1;
+    y = Number(r[3]) < 100 ? 2000 + Number(r[3]) : Number(r[3]);
+  }
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 2000 && y < 2100)) return null;
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function findDueDate(text: string): string | null {
+  for (const m of text.matchAll(DUE_DATE_AT)) {
+    const date = parseDate(text.slice((m.index ?? 0) + m[0].length));
+    if (date) return date;
+  }
+  return null;
+}
+
+/**
+ * A credit card statement or "payment is due" reminder: what's owed and by when. Null for
+ * anything else, including "payment received" messages (those are transfers).
+ */
+export function parseCardBill(address: string, body: string): CardBill | null {
+  const text = body.replace(/\s+/g, " ").trim();
+  if (!/credit card|\bcard\b/i.test(text) || /debit card/i.test(text)) return null;
+  if (!/\bdue\b|\bpayable\b/i.test(text) || BILL_PAID.test(text)) return null;
+  const total = TOTAL_DUE.exec(text) ?? PAYMENT_DUE.exec(text);
+  if (!total) return null;
+  const amount = toAmount(total[1]);
+  const dueDate = findDueDate(text);
+  if (!(amount > 0) || !dueDate) return null;
+  const min = MIN_DUE.exec(text);
+  return {
+    bank: bankFromSender(address, text),
+    last4: findLast4(text),
+    total: amount,
+    minDue: min ? toAmount(min[1]) : null,
+    dueDate,
+  };
+}
+
 /** Stable id for an SMS, sent as ``source_ref`` so it can never be imported twice. */
 export function smsRef(address: string, body: string, date: number): string {
   const s = `${address}|${date}|${body}`;

@@ -172,6 +172,57 @@ export function PaceChart({ width, height = 112, current, previous, daysInMonth,
   );
 }
 
+// --- Balance sparkline -------------------------------------------------------------------
+
+/** A thin line of values over time (oldest first), drawn in, with a dot on the latest. */
+export function Sparkline({ width, height = 30, values }: { width: number; height?: number; values: number[] }) {
+  const palette = usePalette();
+  const draw = useDraw(700, 1300);
+
+  const geo = useMemo(() => {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min;
+    // A flat line (nothing changed) sits in the middle rather than on the floor.
+    const y = (v: number) => (span ? height - 3 - ((v - min) / span) * (height - 6) : height / 2);
+    const pts = values.map((v, i) => [(i / Math.max(1, values.length - 1)) * (width - 4) + 2, y(v)] as [number, number]);
+    const last = pts[pts.length - 1] ?? [width, height / 2];
+    return {
+      pts,
+      last,
+      len: polyLength(pts),
+      area: pts.length > 1 ? `${toPath(pts)} L${last[0].toFixed(1)} ${height} L${pts[0][0].toFixed(1)} ${height} Z` : "",
+    };
+  }, [values, width, height]);
+
+  const lineProps = useAnimatedProps(() => ({ strokeDashoffset: geo.len * (1 - draw.value) }));
+  const fadeProps = useAnimatedProps(() => ({ opacity: Math.max(0, (draw.value - 0.7) / 0.3) }));
+
+  if (geo.pts.length < 2) return null;
+  return (
+    <Svg width={width} height={height} style={{ overflow: "visible" }}>
+      <Defs>
+        <LinearGradient id="spark" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={palette.text} stopOpacity={palette.scheme === "dark" ? 0.1 : 0.07} />
+          <Stop offset="1" stopColor={palette.text} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <AnimatedPath d={geo.area} fill="url(#spark)" animatedProps={fadeProps} />
+      <AnimatedPath
+        d={toPath(geo.pts)}
+        fill="none"
+        stroke={palette.textMuted}
+        strokeWidth={1.3}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        strokeDasharray={`${geo.len} ${geo.len}`}
+        animatedProps={lineProps}
+      />
+      <AnimatedCircle cx={geo.last[0]} cy={geo.last[1]} r={2.6} fill={palette.text} animatedProps={fadeProps} />
+    </Svg>
+  );
+}
+
 // --- Monthly plan dial -------------------------------------------------------------------
 
 const TICKS = Array.from({ length: 60 }, (_, i) => i);

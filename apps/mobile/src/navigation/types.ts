@@ -17,7 +17,8 @@ export type RootStackParamList = {
   Categories: undefined;
   Settings: undefined;
   CatchUp: undefined;
-  Reconcile: undefined;
+  /** `fill`: account id → balance to type in (from a bank SMS). */
+  Reconcile: { fill?: Record<string, number> } | undefined;
 };
 
 declare global {

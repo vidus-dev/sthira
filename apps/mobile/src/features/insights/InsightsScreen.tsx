@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-import { useCategoryMap, useHousehold, useMonthSummary } from "../../api/hooks";
-import type { MonthSummary } from "../../api/types";
+import { useCategoryMap, useHousehold, useMonthSummary, useSavings } from "../../api/hooks";
+import type { MonthSavings, MonthSummary } from "../../api/types";
 import { currentMonth, monthName, sameMonth, shiftMonth, type YearMonth } from "../../core/format/dates";
 import { formatINR, toNumber } from "../../core/format/money";
 import { usePalette } from "../../theme/ThemeProvider";
@@ -191,6 +191,8 @@ export function InsightsScreen() {
         </Rise>
       ) : null}
 
+      <SavingsCard month={month} isCurrent={isCurrent} />
+
       {notice ? (
         <Rise delay={380} style={{ marginHorizontal: GUTTER, marginTop: 12 }}>
           <EdgeCard radius={20} padding={16}>
@@ -207,5 +209,74 @@ export function InsightsScreen() {
         </Rise>
       ) : null}
     </Screen>
+  );
+}
+
+const rate = (m: MonthSavings) => (toNumber(m.income) > 0 ? toNumber(m.net) / toNumber(m.income) : null);
+const pct = (r: number) => `${Math.round(r * 100)}%`;
+
+/** What was kept each month: this month's share of income, and the last six months as bars. */
+function SavingsCard({ month, isCurrent }: { month: YearMonth; isCurrent: boolean }) {
+  const palette = usePalette();
+  const savings = useSavings(12);
+  const all = savings.data?.months ?? [];
+  const at = all.findIndex((m) => m.year === month.year && m.month === month.month);
+  if (at < 0) return null;
+  const sel = all[at];
+  const shown = all.slice(Math.max(0, at - 5), at + 1);
+  const r = rate(sel);
+  const net = toNumber(sel.net);
+  const maxAbs = Math.max(1, ...shown.map((m) => Math.abs(toNumber(m.net))));
+  const anyNegative = shown.some((m) => toNumber(m.net) < 0);
+  const withIncome = shown.filter((m) => toNumber(m.income) > 0 && !(m === sel && isCurrent));
+  const avg = withIncome.length >= 2 ? withIncome.reduce((s, m) => s + toNumber(m.net), 0) / withIncome.reduce((s, m) => s + toNumber(m.income), 0) : null;
+  const BAR = 54;
+
+  return (
+    <Rise delay={350} style={{ marginHorizontal: GUTTER, marginTop: 12 }}>
+      <EdgeCard radius={18} padding={16}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Txt variant="bodyMedium" size={13}>
+            Savings
+          </Txt>
+          <Txt variant="tag">{isCurrent ? "SO FAR" : monthName(month, false).toUpperCase()}</Txt>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+          <Money value={net} size={26} weight="light" tone={net >= 0 ? "positive" : "negative"} />
+          <Txt variant="label" tabular>
+            {r === null ? (net < 0 ? "more out than in" : "kept") : net >= 0 ? `kept · ${pct(r)} of income` : `more out than in · ${pct(-r)} of income`}
+          </Txt>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, marginTop: 16 }}>
+          {shown.map((m) => {
+            const v = toNumber(m.net);
+            const h = Math.max(2, (Math.abs(v) / maxAbs) * BAR);
+            const isSel = m === sel;
+            const color = v < 0 ? palette.negative : isSel ? palette.text : palette.scheme === "dark" ? "#3A3A3A" : "#C9C9C5";
+            return (
+              <View key={`${m.year}-${m.month}`} style={{ flex: 1, alignItems: "center" }}>
+                <View style={{ height: BAR, justifyContent: "flex-end", width: "100%", alignItems: "center" }}>
+                  {v >= 0 ? <View style={{ width: "62%", maxWidth: 26, height: h, borderRadius: 3, backgroundColor: color }} /> : null}
+                </View>
+                {anyNegative ? (
+                  <View style={{ height: BAR / 2, width: "100%", alignItems: "center", borderTopWidth: 1, borderTopColor: palette.track }}>
+                    {v < 0 ? <View style={{ width: "62%", maxWidth: 26, height: Math.min(BAR / 2, h), borderRadius: 3, backgroundColor: color }} /> : null}
+                  </View>
+                ) : null}
+                <Txt variant="tag" tone={isSel ? "text" : "faint"} style={{ marginTop: 7 }}>
+                  {monthName({ year: m.year, month: m.month }, false).toUpperCase()}
+                </Txt>
+              </View>
+            );
+          })}
+        </View>
+
+        <Txt variant="caption" tone="faint" style={{ marginTop: 12, lineHeight: 17 }}>
+          {avg !== null ? `${avg >= 0 ? "Kept" : "Overspent"} ${pct(Math.abs(avg))} of income on average. ` : ""}
+          Salary on a month's last day counts for the next month, like your plan.
+        </Txt>
+      </EdgeCard>
+    </Rise>
   );
 }

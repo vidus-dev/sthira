@@ -199,6 +199,13 @@ export function usePlanAction(ym: YearMonth) {
 export const useMonthSummary = (ym: YearMonth) =>
   useQuery({ queryKey: qk.summary(ym), queryFn: () => api.summary.month(ym.year, ym.month) });
 
+/** Under "summary", so every ledger change refreshes them too. */
+export const useBalanceHistory = (days = 90) =>
+  useQuery({ queryKey: ["summary", "balance-history", days], queryFn: () => api.summary.balanceHistory(days) });
+
+export const useSavings = (months = 12) =>
+  useQuery({ queryKey: ["summary", "savings", months], queryFn: () => api.summary.savings(months) });
+
 export function useMonthTransactions(ym: YearMonth) {
   return useQuery({
     queryKey: qk.monthTx(ym),

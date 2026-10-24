@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import {
   useAccountsWithPending,
+  useBalanceHistory,
   useCategoryMap,
   useHousehold,
   useMonthPlan,
@@ -29,7 +30,7 @@ import {
 import { formatINR, toNumber } from "../../core/format/money";
 import { usePalette } from "../../theme/ThemeProvider";
 import { GUTTER } from "../../theme/tokens";
-import { PaceChart } from "../../ui/charts";
+import { PaceChart, Sparkline } from "../../ui/charts";
 import { Button } from "../../ui/controls";
 import { EdgeCard } from "../../ui/EdgeCard";
 import { Icon } from "../../ui/Icon";
@@ -94,6 +95,14 @@ export function HomeScreen() {
     () => (accounts.data ?? []).reduce((sum, a) => sum + toNumber(a.balance), 0),
     [accounts.data]
   );
+  const history = useBalanceHistory(90);
+  // The last point is today: use the number shown above it (it includes unsynced entries).
+  const trend = useMemo(() => {
+    const pts = history.data?.points ?? [];
+    if (pts.length < 3) return null;
+    const values = [...pts.slice(0, -1).map((p) => toNumber(p.total)), balance];
+    return { values, change: balance - values[0], from: parseDay(pts[0].day) };
+  }, [history.data, balance]);
 
   const s = summary.data;
   const spent = toNumber(s?.expense_total);
@@ -192,6 +201,35 @@ export function HomeScreen() {
         <View style={{ marginTop: 10 }}>
           {accounts.isLoading ? <Skeleton width={230} height={60} /> : <Odometer value={balance} size={58} />}
         </View>
+        {trend ? (
+          <PressableScale onPress={() => nav.navigate("Accounts")} scaleTo={0.99} accessibilityLabel="Balance over time">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 12 }}>
+              <Sparkline width={width - GUTTER * 2 - 118} height={28} values={trend.values} />
+              <View style={{ flex: 1, alignItems: "flex-end", gap: 3 }}>
+                {Math.abs(trend.change) < 1 ? (
+                  <Txt variant="tag" tone="muted">
+                    NO CHANGE
+                  </Txt>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Icon
+                      name={trend.change > 0 ? "arrowUpRight" : "arrowDownLeft"}
+                      size={11}
+                      color={trend.change > 0 ? palette.positive : palette.textMuted}
+                      strokeWidth={2.2}
+                    />
+                    <Txt variant="tag" tone={trend.change > 0 ? "positive" : "muted"} tabular>
+                      {formatINR(Math.abs(trend.change))}
+                    </Txt>
+                  </View>
+                )}
+                <Txt variant="tag" tone="faint" style={{ letterSpacing: 0.8 }}>
+                  SINCE {monoDay(trend.from)}
+                </Txt>
+              </View>
+            </View>
+          </PressableScale>
+        ) : null}
         {s ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 13 }}>
             <Icon name={toNumber(s.net) >= 0 ? "arrowUpRight" : "arrowDownLeft"} size={13} color={toNumber(s.net) >= 0 ? palette.positive : palette.negative} strokeWidth={2.2} />

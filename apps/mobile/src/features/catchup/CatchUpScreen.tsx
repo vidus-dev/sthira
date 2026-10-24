@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, ScrollView, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestSmsPermission } from "../../../modules/sms-inbox";
 import { useAccounts, useCategories, useCategoryMap } from "../../api/hooks";
 import type { Account } from "../../api/types";
@@ -29,46 +31,53 @@ const defaultTicked = (d: Draft) => Boolean(d.accountId) && (d.kind !== "transfe
 export function CatchUpScreen() {
   const nav = useNavigation();
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   const [batch, setBatch] = useState(false);
+  const sel = useDraftSelection();
+  const showBar = sel.permission.granted && sel.drafts.length > 0;
 
   return (
-    <Screen>
-      <StackHeader title="Catch up" subtitle="Bring Sthira up to date in one go" />
-      <SmsSection />
-      <Rise delay={200} style={{ marginTop: 30 }}>
-        <SectionLabel label="OTHER WAYS" />
-        <View style={{ paddingHorizontal: GUTTER }}>
-          <ListRow
-            icon="scale"
-            title="Check balances"
-            subtitle="Type what each bank shows; Sthira records the difference"
-            onPress={() => nav.navigate("Reconcile")}
-            right={<Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />}
-          />
-          <ListRow
-            icon="type"
-            title="Type several at once"
-            subtitle="“swiggy 450 hdfc, milk 60 cash” — one line each"
-            onPress={() => setBatch(true)}
-            right={<Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />}
-          />
-        </View>
-      </Rise>
-      <BatchSheet visible={batch} onClose={() => setBatch(false)} />
-    </Screen>
+    <View style={{ flex: 1 }}>
+      <Screen contentStyle={showBar ? { paddingBottom: BAR_SPACE + insets.bottom } : undefined}>
+        <StackHeader title="Catch up" subtitle="Bring Sthira up to date in one go" />
+        <SmsSection sel={sel} />
+        <Rise delay={200} style={{ marginTop: 30 }}>
+          <SectionLabel label="OTHER WAYS" />
+          <View style={{ paddingHorizontal: GUTTER }}>
+            <ListRow
+              icon="scale"
+              title="Check balances"
+              subtitle="Type what each bank shows; Sthira records the difference"
+              onPress={() => nav.navigate("Reconcile")}
+              right={<Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />}
+            />
+            <ListRow
+              icon="type"
+              title="Type several at once"
+              subtitle="“swiggy 450 hdfc, milk 60 cash” — one line each"
+              onPress={() => setBatch(true)}
+              right={<Icon name="chevronRight" size={15} color={palette.textMuted} strokeWidth={2} />}
+            />
+          </View>
+        </Rise>
+        <BatchSheet visible={batch} onClose={() => setBatch(false)} />
+      </Screen>
+      {showBar ? <DraftBar sel={sel} /> : null}
+    </View>
   );
 }
 
-function SmsSection() {
-  const palette = usePalette();
+/** Room left under the list so the last rows can scroll clear of the floating bar. */
+const BAR_SPACE = 130;
+
+type DraftSelection = ReturnType<typeof useDraftSelection>;
+
+/** Which drafts are ticked. Lives above the list so the floating bar can act on it. */
+function useDraftSelection() {
   const permission = useSmsPermission();
   const scan = useSmsDrafts();
   const actions = useDraftActions();
-  const { data: accounts = [] } = useAccounts();
-  const categoryMap = useCategoryMap();
   const [ticked, setTicked] = useState<Set<string>>(new Set());
-  const [editing, setEditing] = useState<Draft | null>(null);
-  const [blocked, setBlocked] = useState(false);
 
   const drafts = useMemo(() => scan.data?.drafts ?? [], [scan.data]);
   // Tick new drafts as they arrive; keep the user's own choices for the rest.
@@ -80,26 +89,95 @@ function SmsSection() {
     setTicked((t) => new Set([...t, ...fresh.filter(defaultTicked).map((d) => d.ref)]));
   }, [drafts, known]);
 
-  const chosen = drafts.filter((d) => ticked.has(d.ref) && defaultTicked({ ...d, duplicateOf: null }));
-  const unticked = drafts.filter((d) => !ticked.has(d.ref));
-  const byId = new Map(accounts.map((a) => [a.id, a]));
+  const tickedDrafts = drafts.filter((d) => ticked.has(d.ref));
+  const chosen = tickedDrafts.filter((d) => defaultTicked({ ...d, duplicateOf: null }));
 
-  async function allow() {
-    const r = await requestSmsPermission();
-    permission.recheck();
-    if (r === "blocked") setBlocked(true);
-  }
+  return {
+    permission,
+    scan,
+    actions,
+    drafts,
+    ticked,
+    setTicked,
+    chosen,
+    /** Ticked, but no account matched yet — these can't be added until one is picked. */
+    needAccount: tickedDrafts.length - chosen.length,
+    unticked: drafts.filter((d) => !ticked.has(d.ref)),
+    allTicked: drafts.length > 0 && tickedDrafts.length === drafts.length,
+  };
+}
+
+/** Always-visible actions while bank SMS wait, floating over the list like the tab bar. */
+function DraftBar({ sel }: { sel: DraftSelection }) {
+  const palette = usePalette();
+  const insets = useSafeAreaInsets();
+  const { chosen, unticked, needAccount } = sel;
+  const out = chosen.filter((d) => d.kind === "expense").reduce((s, d) => s + d.amount, 0);
 
   function addChosen() {
-    const n = actions.confirm(chosen);
+    const n = sel.actions.confirm(chosen);
     if (n) tapHaptic("success");
   }
 
   function skipUnticked() {
     Alert.alert(`Skip ${unticked.length} SMS?`, "They won't be suggested again.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Skip", style: "destructive", onPress: () => void actions.skip(unticked) },
+      { text: "Skip", style: "destructive", onPress: () => void sel.actions.skip(unticked) },
     ]);
+  }
+
+  return (
+    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[palette.scheme === "dark" ? "rgba(0,0,0,0)" : "rgba(250,250,249,0)", palette.bg]}
+        locations={[0, 0.45]}
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: BAR_SPACE + 30 + insets.bottom }}
+      />
+      <View style={{ paddingHorizontal: GUTTER, paddingBottom: insets.bottom + 14, gap: 8 }}>
+        {needAccount ? (
+          <Txt variant="caption" tone="due" style={{ textAlign: "center" }}>
+            {needAccount} ticked {needAccount === 1 ? "needs" : "need"} an account · tap {needAccount === 1 ? "it" : "them"} to choose
+          </Txt>
+        ) : null}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {unticked.length ? (
+            <Button variant="outline" size="lg" label={`Skip ${unticked.length}`} onPress={skipUnticked} accessibilityLabel={`Skip ${unticked.length} unticked`} />
+          ) : null}
+          <Button
+            size="lg"
+            icon="check"
+            style={{ flex: 1 }}
+            label={chosen.length ? `Add ${chosen.length} ${chosen.length === 1 ? "entry" : "entries"}` : "Tick the ones to add"}
+            disabled={!chosen.length}
+            onPress={addChosen}
+            trailing={
+              out ? (
+                <Txt variant="mono" color={palette.scheme === "dark" ? "#4A4A4A" : "#B5B5B5"}>
+                  {formatINR(out)} out
+                </Txt>
+              ) : undefined
+            }
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SmsSection({ sel }: { sel: DraftSelection }) {
+  const palette = usePalette();
+  const { permission, scan, actions, drafts, ticked, setTicked } = sel;
+  const { data: accounts = [] } = useAccounts();
+  const categoryMap = useCategoryMap();
+  const [editing, setEditing] = useState<Draft | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const byId = new Map(accounts.map((a) => [a.id, a]));
+
+  async function allow() {
+    const r = await requestSmsPermission();
+    permission.recheck();
+    if (r === "blocked") setBlocked(true);
   }
 
   if (!permission.supported) {
@@ -173,9 +251,18 @@ function SmsSection() {
         />
       ) : (
         <>
-          <Txt variant="label" style={{ paddingHorizontal: GUTTER, marginTop: 8 }}>
-            {drafts.length} found · tap one to change it
-          </Txt>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: GUTTER, marginTop: 8 }}>
+            <Txt variant="label">{drafts.length} found · tap one to change it</Txt>
+            <PressableScale
+              hitSlop={10}
+              onPress={() => setTicked(sel.allTicked ? new Set() : new Set(drafts.map((d) => d.ref)))}
+              accessibilityRole="button"
+            >
+              <Txt variant="label" tone="text">
+                {sel.allTicked ? "Untick all" : "Tick all"}
+              </Txt>
+            </PressableScale>
+          </View>
           <View style={{ paddingHorizontal: GUTTER, marginTop: 6 }}>
             {drafts.map((d) => {
               const on = ticked.has(d.ref);
@@ -243,23 +330,6 @@ function SmsSection() {
                 </View>
               );
             })}
-          </View>
-          <View style={{ paddingHorizontal: GUTTER, marginTop: 18, gap: 10 }}>
-            <Button
-              size="lg"
-              icon="check"
-              label={chosen.length ? `Add ${chosen.length} ${chosen.length === 1 ? "entry" : "entries"}` : "Tick the ones to add"}
-              disabled={!chosen.length}
-              onPress={addChosen}
-              trailing={
-                chosen.length ? (
-                  <Txt variant="mono" color={palette.scheme === "dark" ? "#4A4A4A" : "#B5B5B5"}>
-                    {formatINR(chosen.filter((d) => d.kind === "expense").reduce((s, d) => s + d.amount, 0))} out
-                  </Txt>
-                ) : undefined
-              }
-            />
-            {unticked.length ? <Button variant="ghost" label={`Skip ${unticked.length} unticked`} onPress={skipUnticked} /> : null}
           </View>
         </>
       )}

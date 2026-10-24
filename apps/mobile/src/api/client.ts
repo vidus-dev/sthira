@@ -13,6 +13,8 @@ import type {
   LineUpdate,
   MonthPlan,
   MonthSummary,
+  BalanceHistory,
+  SavingsHistory,
   MonthlyPlanStatus,
   PayInput,
   PlanItem,
@@ -216,5 +218,9 @@ export const api = {
   summary: {
     month: (year: number, month: number) =>
       http.requestJson<MonthSummary>({ path: `/v1/summary/month${query({ year, month })}` }),
+    balanceHistory: (days: number) =>
+      http.requestJson<BalanceHistory>({ path: `/v1/summary/balance-history${query({ days: String(days) })}` }),
+    savings: (months: number) =>
+      http.requestJson<SavingsHistory>({ path: `/v1/summary/savings${query({ months: String(months) })}` }),
   },
 };

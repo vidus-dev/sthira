@@ -1,7 +1,7 @@
 // Tests for the bank SMS parser. Run: node scripts/test-sms-parser.mjs (Node 22.6+ runs the .ts directly).
 // Samples follow real bank formats; numbers and names are made up.
 import assert from "node:assert/strict";
-import { parseBankSms, smsRef } from "../src/features/sms/parser.ts";
+import { parseBankSms, parseCardBill, smsRef } from "../src/features/sms/parser.ts";
 
 const cases = [
   ["AX-HDFCBK", "Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 09/10/26 Ref 123456789012 Not You? Call 18002586161/SMS BLOCK UPI to 7308080808", { amount: 450, direction: "debit", last4: "1234", merchant: "SWIGGY", bank: "HDFC" }],
@@ -50,10 +50,43 @@ for (const [addr, body] of ignored) {
     console.log(`FAIL should ignore: ${body.slice(0, 70)}...\n  got ${JSON.stringify(got)}`);
   }
 }
+// Credit card statements and due reminders → what's owed and by when.
+const bills = [
+  ["VM-HDFCBK", "Payment of Rs.15,234.00 is due on your HDFC Bank Credit Card ending 4821 by 15-Oct-26. Min amount due Rs.800.", { bank: "HDFC", last4: "4821", total: 15234, minDue: 800, dueDate: "2026-10-15" }],
+  ["AD-HDFCBK", "Your HDFC Bank Credit Card XX4821 statement is generated. Total Amt Due: Rs 23,450.00; Min Amt Due: Rs 1,180.00. Pay by 05-11-2026.", { last4: "4821", total: 23450, minDue: 1180, dueDate: "2026-11-05" }],
+  ["AD-SBICRD", "Your SBI Card ending 4821 statement dated 20/10/26: Total Amount Due Rs.12,345.67, Minimum Amount Due Rs.620.00, Payment Due Date 09/11/26.", { bank: "SBI", last4: "4821", total: 12345.67, minDue: 620, dueDate: "2026-11-09" }],
+  ["VM-ICICIT", "Statement for ICICI Bank Credit Card XX4821: Total Amount Due INR 8,765.00, Minimum Amount Due INR 440.00, Due Date 05-Nov-26.", { bank: "ICICI", total: 8765, minDue: 440, dueDate: "2026-11-05" }],
+  ["AX-AXISBK", "Axis Bank Credit Card XX4821 statement: Total amount due INR 5,432.10, Min due INR 272. Due by 7 November 2026.", { bank: "Axis", total: 5432.1, minDue: 272, dueDate: "2026-11-07" }],
+  ["VM-ICICIT", "Reminder: Your ICICI Bank Credit Card XX4821 payment of INR 8,765.00 is due on 2026-11-05.", { total: 8765, minDue: null, dueDate: "2026-11-05" }],
+];
+const notBills = [
+  ["VM-HDFCBK", "Payment of Rs.15000.00 received towards your HDFC Bank Credit Card ending 4821. Thank you"],
+  ["VM-HDFCBK", "Rs.1500.00 spent on HDFC Bank Card x4821 at AMAZON on 2026-10-09:20:42:11. Avl bal: Rs.23,456.00."],
+  ["JD-HDFCBK", "Rs.499 will be debited from your HDFC Bank A/c XX1234 on 12-10-26 towards NETFLIX mandate."],
+  ["AD-HDFCBK", "EMI of Rs 6,300 for your loan is due on 05-11-26. Keep balance in A/c XX1234."],
+];
+for (const [addr, body, want] of bills) {
+  const got = parseCardBill(addr, body);
+  try {
+    assert.ok(got, "should parse as a card bill");
+    for (const [k, v] of Object.entries(want)) assert.deepEqual(got[k], v, `${k}`);
+  } catch (e) {
+    failed++;
+    console.log(`FAIL bill ${addr}: ${body.slice(0, 70)}...\n  ${e.message}\n  got ${JSON.stringify(got)}`);
+  }
+}
+for (const [addr, body] of notBills) {
+  const got = parseCardBill(addr, body);
+  if (got) {
+    failed++;
+    console.log(`FAIL not a bill: ${body.slice(0, 70)}...\n  got ${JSON.stringify(got)}`);
+  }
+}
+
 const a = smsRef("AX-HDFCBK", "x", 1);
 assert.equal(a, smsRef("AX-HDFCBK", "x", 1));
 assert.notEqual(a, smsRef("AX-HDFCBK", "x", 2));
 assert.match(a, /^sms:[0-9a-f]{16}$/);
 
-console.log(failed ? `${failed} failed` : `all ${cases.length + ignored.length} SMS cases pass`);
+console.log(failed ? `${failed} failed` : `all ${cases.length + ignored.length + bills.length + notBills.length} SMS cases pass`);
 process.exit(failed ? 1 : 0);

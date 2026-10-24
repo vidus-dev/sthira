@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "../../api/client";
 import { useAccounts, useCategoryMap, useMonthPlan, usePlanAction } from "../../api/hooks";
-import type { PlanLine } from "../../api/types";
+import type { Account, PlanLine } from "../../api/types";
+import { useAuth } from "../../auth/AuthContext";
 import { currentMonth, dayHeader, daysFromToday, monoDay, parseDay, sameMonth, shiftMonth, type YearMonth } from "../../core/format/dates";
 import { formatINR, toNumber } from "../../core/format/money";
 import { usePalette } from "../../theme/ThemeProvider";
@@ -18,7 +21,8 @@ import { PressableScale, tapHaptic } from "../../ui/PressableScale";
 import { Txt } from "../../ui/Txt";
 import { useQuickAdd } from "../add/QuickAddContext";
 import { MonthSwitcher } from "../activity/ActivityScreen";
-import { categoryIcon } from "../shared";
+import { accountIcon, accountLabel, categoryIcon } from "../shared";
+import { useSmsDrafts, type SmsCardBill } from "../sms/useSmsDrafts";
 import { LineEditor, type EditorTarget } from "./LineEditor";
 import { LineSheet } from "./LineSheet";
 import { amountText, monthWord, SUGGESTIONS } from "./planText";
@@ -79,6 +83,7 @@ export function PlanScreen() {
       date ? `due ${monoDay(date).replace(/^0/, "")}` : null,
       s.dest_account_id ? `→ ${accountName(s.dest_account_id)}` : null,
     ].filter(Boolean).join(" · ");
+    const toCard = accounts.find((a) => a.id === s.dest_account_id)?.account_type === "credit";
     return (
       <ListRow
         key={s.id}
@@ -93,7 +98,7 @@ export function PlanScreen() {
         right={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             {s.status === "awaiting_income" ? null : <Money value={partial ? s.remaining : s.due_amount} />}
-            {s.status === "awaiting_income" ? null : <Pill label={s.dest_account_id ? "Move" : "Pay"} />}
+            {s.status === "awaiting_income" ? null : <Pill label={s.dest_account_id && !toCard ? "Move" : "Pay"} />}
           </View>
         }
       />
@@ -214,6 +219,8 @@ export function PlanScreen() {
               </PressableScale>
             </Rise>
           ) : null}
+
+          {canPlan ? <CardBills month={month} items={p.items} accounts={accounts} onAdd={(run) => action.mutate(run, { onSuccess: () => tapHaptic("success") })} /> : null}
 
           {groups.toFill.length ? (
             <Rise delay={220} style={{ marginTop: 24 }}>
@@ -418,3 +425,104 @@ function Suggestions({ existing = [], onPick }: { existing?: PlanLine[]; onPick:
   );
 }
 
+
+const skippedBillsKey = (userId: string) => `sthira.cardBills.skipped.${userId}`;
+
+/**
+ * Credit card statements read from bank SMS whose due date falls in this month and that
+ * aren't in the plan yet. Adding one makes a one-off bill paid by moving money to the card.
+ */
+function CardBills({
+  month,
+  items,
+  accounts,
+  onAdd,
+}: {
+  month: YearMonth;
+  items: PlanLine[];
+  accounts: Account[];
+  onAdd: (run: () => ReturnType<typeof api.monthPlan.addLine>) => void;
+}) {
+  const nav = useNavigation();
+  const { user } = useAuth();
+  const sms = useSmsDrafts();
+  const [skipped, setSkipped] = useState<string[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    AsyncStorage.getItem(skippedBillsKey(user.id))
+      .then((raw) => setSkipped(raw ? (JSON.parse(raw) as string[]) : []))
+      .catch(() => {});
+  }, [user]);
+
+  const bills = (sms.data?.cardBills ?? []).filter((b) => {
+    const due = parseDay(b.dueDate);
+    if (due.getFullYear() !== month.year || due.getMonth() + 1 !== month.month) return false;
+    if (skipped.includes(b.ref)) return false;
+    return !items.some((i) => b.accountId && i.dest_account_id === b.accountId);
+  });
+  if (!bills.length) return null;
+
+  const skip = (b: SmsCardBill) => {
+    const next = [...skipped, b.ref].slice(-200);
+    setSkipped(next);
+    if (user) void AsyncStorage.setItem(skippedBillsKey(user.id), JSON.stringify(next)).catch(() => {});
+  };
+
+  const add = (b: SmsCardBill, card: Account) =>
+    onAdd(() =>
+      api.monthPlan.addLine(month.year, month.month, {
+        name: `${card.display_name} bill`,
+        category_slug: "transfer",
+        kind: "bill",
+        amount_type: "fixed",
+        amount: b.total.toFixed(2),
+        dest_account_id: card.id,
+        due_day: parseDay(b.dueDate).getDate(),
+        notes: b.minDue ? `Minimum due ${formatINR(b.minDue)}` : null,
+        repeat: false,
+      })
+    );
+
+  return (
+    <Rise delay={200} style={{ marginTop: 24 }}>
+      <SectionLabel label="CARD BILLS FROM SMS" right={String(bills.length)} />
+      <View style={{ paddingHorizontal: GUTTER, marginTop: 2 }}>
+        {bills.map((b) => {
+          const card = accounts.find((a) => a.id === b.accountId);
+          const name = card ? accountLabel(card) : `${b.bank ?? "Credit"} card${b.last4 ? ` ••${b.last4}` : ""}`;
+          return (
+            <ListRow
+              key={b.ref}
+              icon={accountIcon("credit")}
+              title={name}
+              subtitle={
+                <Txt variant="caption" tone={card ? "muted" : "due"} numberOfLines={1} tabular>
+                  {card
+                    ? `${formatINR(b.total, { paise: b.total % 1 !== 0 })} due ${monoDay(parseDay(b.dueDate)).replace(/^0/, "")}${b.minDue ? ` · min ${formatINR(b.minDue)}` : ""}`
+                    : "Add this card in Accounts (with its last 4 digits)"}
+                </Txt>
+              }
+              onLongPress={() => skip(b)}
+              right={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <PressableScale onPress={() => skip(b)} hitSlop={6} accessibilityLabel={`Skip ${name} bill`}>
+                    <Pill variant="outline" label="Skip" />
+                  </PressableScale>
+                  {card ? (
+                    <PressableScale onPress={() => add(b, card)} accessibilityLabel={`Add ${name} bill to the plan`}>
+                      <Pill label="Add" />
+                    </PressableScale>
+                  ) : (
+                    <PressableScale onPress={() => nav.navigate("Accounts")} accessibilityLabel="Open accounts">
+                      <Pill label="Accounts" />
+                    </PressableScale>
+                  )}
+                </View>
+              }
+            />
+          );
+        })}
+      </View>
+    </Rise>
+  );
+}

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useAccounts, useDeleteAccount, useHousehold, useReconcileAccount, useSaveAccount } from "../../api/hooks";
 import type { Account, AccountType } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
 import { ApiError } from "../../core/api/ApiError";
+import { dayHeader } from "../../core/format/dates";
 import { formatINR, keypadToDecimal, toNumber } from "../../core/format/money";
 import { usePalette } from "../../theme/ThemeProvider";
 import { GUTTER } from "../../theme/tokens";
-import { Button, Chip, Segmented, TextField } from "../../ui/controls";
+import { Button, Chip, Pill, Segmented, TextField } from "../../ui/controls";
 import { EdgeCard } from "../../ui/EdgeCard";
 import { Icon } from "../../ui/Icon";
 import { EmptyState, Rise, Screen, SectionLabel } from "../../ui/layout";
@@ -18,6 +20,7 @@ import { Sheet } from "../../ui/Sheet";
 import { StackHeader } from "../../ui/StackHeader";
 import { Txt } from "../../ui/Txt";
 import { ACCOUNT_TYPES, accountIcon, firstName, memberName } from "../shared";
+import { useBankChecks, type BankCheck } from "../sms/bankCheck";
 
 const GROUPS: { label: string; types: AccountType[] }[] = [
   { label: "BANKS", types: ["savings", "checking"] },
@@ -28,6 +31,7 @@ const GROUPS: { label: string; types: AccountType[] }[] = [
 
 export function AccountsScreen() {
   const accounts = useAccounts();
+  const checks = useBankChecks();
   const { data: household } = useHousehold();
   const [editing, setEditing] = useState<{ account?: Account } | null>(null);
   const rows = accounts.data ?? [];
@@ -74,17 +78,22 @@ export function AccountsScreen() {
             <View style={{ paddingHorizontal: GUTTER }}>
               {items.map((a) => {
                 const owner = a.owner_user_id ? memberName(household?.members, a.owner_user_id) : "Joint";
+                const check = checks[a.id];
+                const off = check ? Math.abs(check.diff) >= 1 : false;
                 return (
-                  <ListRow
-                    key={a.id}
-                    icon={accountIcon(a.account_type)}
-                    title={a.display_name}
-                    subtitle={[a.institution, a.mask_last4 ? `••${a.mask_last4}` : null, (household?.members.length ?? 1) > 1 ? firstName(owner) : null]
-                      .filter(Boolean)
-                      .join(" · ") || ACCOUNT_TYPES.find((t) => t.value === a.account_type)?.label}
-                    onPress={() => setEditing({ account: a })}
-                    right={<Money value={a.balance} tone={toNumber(a.balance) < 0 ? "negative" : "text"} />}
-                  />
+                  <View key={a.id}>
+                    <ListRow
+                      divider={!check}
+                      icon={accountIcon(a.account_type)}
+                      title={a.display_name}
+                      subtitle={[a.institution, a.mask_last4 ? `••${a.mask_last4}` : null, (household?.members.length ?? 1) > 1 ? firstName(owner) : null]
+                        .filter(Boolean)
+                        .join(" · ") || ACCOUNT_TYPES.find((t) => t.value === a.account_type)?.label}
+                      onPress={() => setEditing({ account: a })}
+                      right={<Money value={a.balance} tone={toNumber(a.balance) < 0 ? "negative" : "text"} />}
+                    />
+                    {check ? <BankLine check={check} off={off} accountId={a.id} /> : null}
+                  </View>
                 );
               })}
             </View>
@@ -94,6 +103,41 @@ export function AccountsScreen() {
 
       <AccountEditor editing={editing} onClose={() => setEditing(null)} />
     </Screen>
+  );
+}
+
+/** Under an account: what the bank's last SMS said, and a way to line Sthira up with it. */
+function BankLine({ check, off, accountId }: { check: BankCheck; off: boolean; accountId: string }) {
+  const palette = usePalette();
+  const nav = useNavigation();
+  const when = dayHeader(new Date(check.date));
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 53, paddingBottom: 10, minHeight: 30, borderBottomWidth: 1, borderBottomColor: palette.hairline }}>
+      {off ? (
+        <>
+          <Txt variant="caption" tone="due" tabular numberOfLines={2} style={{ flex: 1, lineHeight: 17 }}>
+            Bank SMS {when}: {formatINR(check.bankBalance, { paise: check.bankBalance % 1 !== 0 })} ·{" "}
+            {formatINR(Math.abs(check.diff))} {check.diff < 0 ? "less than Sthira" : "more than Sthira"}
+          </Txt>
+          {check.waiting ? (
+            <PressableScale onPress={() => nav.navigate("CatchUp")} accessibilityLabel={`Add ${check.waiting} waiting SMS`}>
+              <Pill variant="outline" label={`${check.waiting} SMS waiting`} />
+            </PressableScale>
+          ) : (
+            <PressableScale onPress={() => nav.navigate("Reconcile", { fill: { [accountId]: check.fixTo } })} accessibilityLabel="Fix balance">
+              <Pill label="Fix" />
+            </PressableScale>
+          )}
+        </>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Icon name="check" size={12} color={palette.positive} strokeWidth={2.4} />
+          <Txt variant="caption" tone="faint">
+            Matches the bank SMS · {when}
+          </Txt>
+        </View>
+      )}
+    </View>
   );
 }
 
